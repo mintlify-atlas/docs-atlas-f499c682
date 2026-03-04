@@ -1,0 +1,388 @@
+---
+title: Design Twitter Timeline and Search
+description: Learn how to design Twitter's timeline feed and search functionality to handle millions of tweets and billions of reads per month
+---
+
+## Overview
+
+Design the core features of Twitter including posting tweets, viewing timelines, and searching. This problem explores fanout strategies, caching, search indexing, and scaling to handle 100 million active users generating 500 million tweets per day.
+
+<Note>
+**Design the Facebook feed** and **Design Facebook search** are similar questions with comparable challenges.
+</Note>
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** posts a tweet
+  - **Service** pushes tweets to followers, sending push notifications and emails
+- **User** views the user timeline (activity from the user)
+- **User** views the home timeline (activity from people the user is following)
+- **User** searches keywords
+- **Service** has high availability
+
+#### Out of Scope
+
+- Service pushes tweets to the Twitter Firehose and other streams
+- Service strips out tweets based on users' visibility settings
+- Analytics
+
+### Constraints and Assumptions
+
+**General Assumptions:**
+
+- Traffic is not evenly distributed
+- Posting a tweet should be fast
+- Fanning out a tweet should be fast, unless you have millions of followers
+- 100 million active users
+- 500 million tweets per day or 15 billion tweets per month
+- Each tweet averages a fanout of 10 deliveries
+- 5 billion total tweets delivered on fanout per day
+- 150 billion tweets delivered on fanout per month
+- 250 billion read requests per month
+- 10 billion searches per month
+
+**Timeline Specific:**
+
+- Viewing the timeline should be fast
+- Twitter is more read heavy than write heavy
+- Optimize for fast reads of tweets
+- Ingesting tweets is write heavy
+
+**Search Specific:**
+
+- Searching should be fast
+- Search is read-heavy
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Size per tweet:**
+- `tweet_id` - 8 bytes
+- `user_id` - 32 bytes
+- `text` - 140 bytes
+- `media` - 10 KB average
+- **Total: ~10 KB**
+
+**Storage:**
+- 150 TB of new tweet content per month
+  - 10 KB per tweet × 500 million tweets per day × 30 days
+- 5.4 PB of new tweet content in 3 years
+
+**Throughput:**
+- 100,000 read requests per second
+- 6,000 tweets per second
+- 60,000 tweets delivered on fanout per second
+- 4,000 search requests per second
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Twitter High Level Design](http://i.imgur.com/48tEA2j.png)
+
+## Step 3: Core Components
+
+### Use Case: User Posts a Tweet
+
+<Steps>
+
+<Step title="Client posts tweet">
+  The Client posts a tweet to the Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Write API">
+  The Web Server forwards the request to the Write API server
+</Step>
+
+<Step title="Store in user timeline">
+  The Write API stores the tweet in the user's timeline in a SQL database
+</Step>
+
+<Step title="Fan out to followers">
+  The Write API contacts the Fan Out Service, which:
+  - Queries the User Graph Service to find followers (stored in Memory Cache)
+  - Stores the tweet in followers' home timelines in Memory Cache (O(n) operation)
+  - Stores the tweet in the Search Index Service
+  - Stores media in Object Store
+  - Uses Notification Service to send push notifications (via Queue)
+</Step>
+
+</Steps>
+
+#### Memory Cache Structure
+
+If using Redis, we can use a native list structure:
+
+```
+           tweet n+2                   tweet n+1                   tweet n
+| 8 bytes   8 bytes  1 byte | 8 bytes   8 bytes  1 byte | 8 bytes   8 bytes  1 byte |
+| tweet_id  user_id  meta   | tweet_id  user_id  meta   | tweet_id  user_id  meta   |
+```
+
+#### REST API
+
+**Post tweet:**
+
+```bash
+curl -X POST --data '{ "user_id": "123", "auth_token": "ABC123", \
+    "status": "hello world!", "media_ids": "ABC987" }' \
+    https://twitter.com/api/v1/tweet
+```
+
+**Response:**
+
+```json
+{
+    "created_at": "Wed Sep 05 00:37:15 +0000 2012",
+    "status": "hello world!",
+    "tweet_id": "987",
+    "user_id": "123"
+}
+```
+
+### Use Case: User Views Home Timeline
+
+<Steps>
+
+<Step title="Client requests timeline">
+  The Client posts a home timeline request to the Web Server
+</Step>
+
+<Step title="Web Server routes to Read API">
+  The Web Server forwards the request to the Read API server
+</Step>
+
+<Step title="Timeline Service fetches data">
+  The Read API contacts the Timeline Service, which:
+  - Gets timeline data from Memory Cache (tweet ids and user ids) - O(1)
+  - Queries Tweet Info Service with multiget for tweet details - O(n)
+  - Queries User Info Service with multiget for user details - O(n)
+</Step>
+
+</Steps>
+
+**REST API:**
+
+```bash
+curl https://twitter.com/api/v1/home_timeline?user_id=123
+```
+
+**Response:**
+
+```json
+[
+  {
+    "user_id": "456",
+    "tweet_id": "123",
+    "status": "foo"
+  },
+  {
+    "user_id": "789",
+    "tweet_id": "456",
+    "status": "bar"
+  }
+]
+```
+
+### Use Case: User Views User Timeline
+
+<Steps>
+
+<Step title="Client requests user timeline">
+  The Client posts a user timeline request to the Web Server
+</Step>
+
+<Step title="Web Server routes to Read API">
+  The Web Server forwards the request to the Read API server
+</Step>
+
+<Step title="Fetch from SQL Database">
+  The Read API retrieves the user timeline from the SQL Database
+</Step>
+
+</Steps>
+
+The REST API is similar to home timeline, except all tweets come from the user rather than people they follow.
+
+### Use Case: User Searches Keywords
+
+<Steps>
+
+<Step title="Client sends search request">
+  The Client sends a search request to the Web Server
+</Step>
+
+<Step title="Web Server routes to Search API">
+  The Web Server forwards the request to the Search API server
+</Step>
+
+<Step title="Search Service processes query">
+  The Search API contacts the Search Service, which:
+  - Parses/tokenizes the input query
+    - Removes markup
+    - Breaks text into terms
+    - Fixes typos
+    - Normalizes capitalization
+    - Converts to boolean operations
+  - Queries the Search Cluster (e.g., Lucene)
+    - Scatter-gathers across servers
+    - Merges, ranks, sorts, and returns results
+</Step>
+
+</Steps>
+
+**REST API:**
+
+```bash
+curl https://twitter.com/api/v1/search?query=hello+world
+```
+
+The response format is similar to the home timeline.
+
+## Step 4: Scale the Design
+
+![Twitter Scaled Design](http://i.imgur.com/jrUBAF7.png)
+
+<Warning>
+**Important:** Take an iterative approach to scaling:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks while evaluating alternatives and trade-offs
+4. Repeat
+</Warning>
+
+### Key Bottlenecks and Solutions
+
+<AccordionGroup>
+
+<Accordion title="Fanout Service Bottleneck">
+**Problem:** Twitter users with millions of followers could take minutes for fanout.
+
+**Solutions:**
+- Avoid fanning out tweets from highly-followed users
+- Instead, search for tweets from highly-followed users at serve time
+- Merge search results with home timeline results
+- Re-order tweets at serve time to handle race conditions with replies
+</Accordion>
+
+<Accordion title="Memory Cache Optimizations">
+- Keep only several hundred tweets per home timeline
+- Keep only active users' home timeline info (past 30 days)
+- For inactive users, rebuild timeline from SQL Database on demand:
+  - Query User Graph Service for who they follow
+  - Get tweets from SQL Database
+  - Add to Memory Cache
+</Accordion>
+
+<Accordion title="Storage Optimizations">
+- Store only a month of tweets in Tweet Info Service
+- Store only active users in User Info Service
+- Search Cluster needs tweets in memory for low latency
+</Accordion>
+
+<Accordion title="SQL Database Scaling">
+**Problem:** High volume of writes overwhelms single SQL Write Master-Slave.
+
+**Solutions:**
+- Federation - Split by function
+- Sharding - Distribute data
+- Denormalization - Optimize reads
+- SQL Tuning - Optimize queries
+- Consider NoSQL for appropriate data
+</Accordion>
+
+</AccordionGroup>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="CDN" icon="server">
+Serve static content with low latency
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Horizontal scaling as reverse proxies
+</Card>
+
+<Card title="API Servers" icon="code">
+Separate Read/Write APIs for independent scaling
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Handle read-heavy workload and traffic spikes
+</Card>
+
+<Card title="SQL Database" icon="table">
+Master-Slave replication with read replicas
+</Card>
+
+<Card title="Object Store" icon="folder">
+Store media files (photos, videos)
+</Card>
+
+</CardGroup>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="NoSQL Options" icon="database">
+- Key-value store
+- Document store
+- Wide column store
+- Graph database
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+<Card title="Communication Patterns" icon="network-wired">
+- REST for external APIs
+- RPC for internal services
+- Service discovery
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **Fanout strategy** is critical for timeline generation
+  - Pre-compute timelines for most users
+  - Handle celebrities differently (compute at read time)
+- **Memory Cache** (Redis) stores home timelines for fast access
+- **Search Cluster** (Lucene) enables fast keyword search
+- **Separate Read/Write APIs** allow independent scaling
+- **Object Store** handles media files efficiently
+- **SQL Database** needs advanced scaling patterns (federation, sharding)
+- **Iterative approach** to scaling is essential

@@ -1,0 +1,449 @@
+---
+title: Design Mint.com
+description: Learn how to design a personal finance management system like Mint.com that handles millions of users and billions of transactions
+---
+
+## Overview
+
+Design a personal finance management system like Mint.com that automatically categorizes transactions, analyzes spending, and provides budget recommendations. This problem explores financial data integration, transaction processing, categorization algorithms, and real-time budget tracking.
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** connects to a financial account
+- **Service** extracts transactions from the account
+  - Updates daily
+  - Categorizes transactions
+    - Allows manual category override by user
+    - No automatic re-categorization
+  - Analyzes monthly spending by category
+- **Service** recommends a budget
+  - Allows users to manually set budget
+  - Sends notifications when approaching or exceeding budget
+- **Service** has high availability
+
+#### Out of Scope
+
+- Additional logging and analytics
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+- Automatic daily update applies only to users active in past 30 days
+- Adding/removing financial accounts is relatively rare
+- Budget notifications don't need to be instant
+- 10 million users
+  - 10 budget categories per user = 100 million budget items
+  - Example categories: Housing ($1,000), Food ($200), Gas ($100)
+- Sellers determine transaction category
+  - 50,000 sellers
+- 30 million financial accounts
+- 5 billion transactions per month
+- 500 million read requests per month
+- 10:1 write to read ratio (write-heavy)
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Size per transaction:**
+- `user_id` - 8 bytes
+- `created_at` - 5 bytes
+- `seller` - 32 bytes
+- `amount` - 5 bytes
+- **Total: ~50 bytes**
+
+**Storage:**
+- 250 GB of new transaction content per month
+  - 50 bytes per transaction × 5 billion transactions per month
+- 9 TB of new transaction content in 3 years
+
+**Throughput:**
+- 2,000 transactions per second on average
+- 200 read requests per second on average
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Mint.com High Level Design](http://i.imgur.com/E8klrBh.png)
+
+## Step 3: Core Components
+
+### Use Case: User Connects Financial Account
+
+<Steps>
+
+<Step title="Client submits account info">
+  The Client sends a request to the Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Accounts API">
+  The Web Server forwards the request to the Accounts API server
+</Step>
+
+<Step title="Store account credentials">
+  The Accounts API updates the SQL Database `accounts` table with:
+  - Account URL
+  - Login credentials (hashed password)
+  - User ID reference
+</Step>
+
+</Steps>
+
+#### Database Schema
+
+**Accounts table:**
+
+```sql
+id int NOT NULL AUTO_INCREMENT
+created_at datetime NOT NULL
+last_update datetime NOT NULL
+account_url varchar(255) NOT NULL
+account_login varchar(32) NOT NULL
+account_password_hash char(64) NOT NULL
+user_id int NOT NULL
+PRIMARY KEY(id)
+FOREIGN KEY(user_id) REFERENCES users(id)
+```
+
+Indexes on `id`, `user_id`, and `created_at` for fast lookups and in-memory data.
+
+**REST API:**
+
+```bash
+curl -X POST --data '{ "user_id": "foo", "account_url": "bar", \
+    "account_login": "baz", "account_password": "qux" }' \
+    https://mint.com/api/v1/account
+```
+
+### Use Case: Service Extracts Transactions
+
+Extract transactions when:
+- User first links account
+- User manually refreshes
+- Automatically each day for active users (past 30 days)
+
+<Steps>
+
+<Step title="Client triggers extraction">
+  Client sends request to Web Server
+</Step>
+
+<Step title="Accounts API queues job">
+  Accounts API places job on Queue (SQS/RabbitMQ) for asynchronous processing
+</Step>
+
+<Step title="Transaction Extraction Service processes">
+  The service:
+  - Pulls job from Queue
+  - Extracts transactions from financial institution
+  - Stores raw logs in Object Store
+  - Uses Category Service to categorize transactions
+  - Uses Budget Service to calculate monthly spending
+  - Budget Service uses Notification Service if approaching/exceeding budget
+  - Updates SQL Database `transactions` and `monthly_spending` tables
+  - Notifies user via Notification Service
+</Step>
+
+</Steps>
+
+#### Transaction Schema
+
+**Transactions table:**
+
+```sql
+id int NOT NULL AUTO_INCREMENT
+created_at datetime NOT NULL
+seller varchar(32) NOT NULL
+amount decimal NOT NULL
+user_id int NOT NULL
+PRIMARY KEY(id)
+FOREIGN KEY(user_id) REFERENCES users(id)
+```
+
+**Monthly spending table:**
+
+```sql
+id int NOT NULL AUTO_INCREMENT
+month_year date NOT NULL
+category varchar(32)
+amount decimal NOT NULL
+user_id int NOT NULL
+PRIMARY KEY(id)
+FOREIGN KEY(user_id) REFERENCES users(id)
+```
+
+Indexes on `id` and `user_id` for both tables.
+
+### Category Service
+
+Seed a seller-to-category dictionary with popular sellers:
+- 50,000 sellers × ~255 bytes = ~12 MB (fits in memory)
+
+<Accordion title="Category Service implementation">
+
+```python
+class DefaultCategories(Enum):
+    HOUSING = 0
+    FOOD = 1
+    GAS = 2
+    SHOPPING = 3
+    ...
+
+seller_category_map = {}
+seller_category_map['Exxon'] = DefaultCategories.GAS
+seller_category_map['Target'] = DefaultCategories.SHOPPING
+```
+
+For unknown sellers, use crowdsourcing from manual user overrides:
+
+```python
+class Categorizer(object):
+
+    def __init__(self, seller_category_map, seller_category_crowd_overrides_map):
+        self.seller_category_map = seller_category_map
+        self.seller_category_crowd_overrides_map = seller_category_crowd_overrides_map
+
+    def categorize(self, transaction):
+        if transaction.seller in self.seller_category_map:
+            return self.seller_category_map[transaction.seller]
+        elif transaction.seller in self.seller_category_crowd_overrides_map:
+            self.seller_category_map[transaction.seller] = \
+                self.seller_category_crowd_overrides_map[transaction.seller].peek_min()
+            return self.seller_category_map[transaction.seller]
+        return None
+```
+
+```python
+class Transaction(object):
+    def __init__(self, created_at, seller, amount):
+        self.created_at = created_at
+        self.seller = seller
+        self.amount = amount
+```
+
+</Accordion>
+
+### Use Case: Service Recommends Budget
+
+Use generic budget templates based on income tiers. Only store user overrides in `budget_overrides` table.
+
+<Accordion title="Budget Service implementation">
+
+```python
+class Budget(object):
+
+    def __init__(self, income):
+        self.income = income
+        self.categories_to_budget_map = self.create_budget_template()
+
+    def create_budget_template(self):
+        return {
+            DefaultCategories.HOUSING: self.income * .4,
+            DefaultCategories.FOOD: self.income * .2,
+            DefaultCategories.GAS: self.income * .1,
+            DefaultCategories.SHOPPING: self.income * .2,
+            ...
+        }
+
+    def override_category_budget(self, category, amount):
+        self.categories_to_budget_map[category] = amount
+```
+
+</Accordion>
+
+### Generating Monthly Spending with MapReduce
+
+Instead of SQL queries, run MapReduce on raw transaction files:
+
+<Accordion title="MapReduce implementation">
+
+**Log file format (tab delimited):**
+```
+user_id   timestamp   seller  amount
+```
+
+**MapReduce implementation:**
+
+```python
+class SpendingByCategory(MRJob):
+
+    def __init__(self, categorizer):
+        self.categorizer = categorizer
+        self.current_year_month = calc_current_year_month()
+
+    def mapper(self, _, line):
+        """Parse log line and emit (user_id, period, category), amount"""
+        user_id, timestamp, seller, amount = line.split('\t')
+        category = self.categorizer.categorize(seller)
+        period = self.extract_year_month(timestamp)
+        if period == self.current_year_month:
+            yield (user_id, period, category), amount
+
+    def reducer(self, key, values):
+        """Sum values for each key"""
+        total = sum(values)
+        yield key, total
+```
+
+</Accordion>
+
+Running MapReduce on transaction files significantly reduces database load.
+
+## Step 4: Scale the Design
+
+![Mint.com Scaled Design](http://i.imgur.com/V5q57vU.png)
+
+<Warning>
+**Important:** Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks
+4. Repeat
+</Warning>
+
+### Additional Use Case: User Accesses Summaries
+
+<Steps>
+
+<Step title="Check Memory Cache">
+  Read API checks Memory Cache (Redis/Memcached) for:
+  - User sessions
+  - Aggregate stats by category
+  - Recent transactions
+</Step>
+
+<Step title="Fetch from database on cache miss">
+  If not in cache:
+  - Fetch from SQL Database
+  - Update Memory Cache
+</Step>
+
+<Step title="Serve static content from CDN">
+  Static content served from Object Store (S3) cached on CDN
+</Step>
+
+</Steps>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="CDN" icon="server">
+Serve static content with low latency
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Reverse proxies for horizontal scaling
+</Card>
+
+<Card title="API Servers" icon="code">
+Separate Read/Write APIs
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Handle 200 average reads/second
+- User sessions
+- Aggregate stats
+- Recent transactions
+</Card>
+
+<Card title="SQL Database" icon="table">
+Master-Slave with read replicas
+- 2,000 writes/second requires scaling
+</Card>
+
+<Card title="Analytics Database" icon="chart-line">
+Data warehouse (Redshift/BigQuery) for `monthly_spending`
+</Card>
+
+</CardGroup>
+
+### Database Scaling Strategies
+
+<Warning>
+2,000 average transaction writes per second may overwhelm single SQL Write Master-Slave.
+</Warning>
+
+**SQL Scaling Patterns:**
+
+- **Federation** - Split databases by function
+- **Sharding** - Distribute data across databases
+- **Denormalization** - Optimize read performance
+- **SQL Tuning** - Optimize queries and indexes
+- **NoSQL** - Move appropriate data to NoSQL
+
+**Storage Optimization:**
+- Store only one month of transactions in SQL Database
+- Archive rest in data warehouse or Object Store
+- S3 easily handles 250 GB/month constraint
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/mint">
+  View the complete Python implementation including categorization and MapReduce logic.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="NoSQL Options" icon="database">
+- Key-value store
+- Document store
+- Wide column store
+- SQL vs NoSQL tradeoffs
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+<Card title="Communication Patterns" icon="network-wired">
+- REST for external APIs
+- RPC for internal services
+- Service discovery
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **Asynchronous processing** with queues handles transaction extraction
+- **Category Service** uses in-memory dictionary + crowdsourcing
+- **MapReduce** generates spending aggregates from raw logs
+- **Budget templates** reduce storage (only store overrides)
+- **Memory Cache** serves frequent reads (sessions, stats, transactions)
+- **Write-heavy workload** (10:1) requires SQL scaling patterns
+- **Data warehousing** for analytics (Redshift/BigQuery)
+- **Object Store** archives old transactions

@@ -1,0 +1,279 @@
+---
+title: Design a Deck of Cards
+description: Implement a generic deck of cards with BlackJack game specialization
+---
+
+## Problem Statement
+
+Design a flexible deck of cards system that supports generic card games and can be extended for specific games like BlackJack.
+
+## Constraints and Assumptions
+
+- Design a generic deck, then extend for BlackJack
+- Standard 52-card deck (2-10, Jack, Queen, King, Ace) with 4 suits
+- Inputs are valid (no validation needed)
+- Deck fits in memory
+
+## Design Overview
+
+The implementation uses inheritance and abstraction to create a flexible card game system:
+
+1. **Suit**: Enum for card suits
+2. **Card**: Abstract base class for all cards
+3. **BlackJackCard**: Concrete card implementation for BlackJack
+4. **Hand**: Generic hand of cards
+5. **BlackJackHand**: BlackJack-specific hand with scoring
+6. **Deck**: Card deck with dealing and shuffling
+
+<Note>
+  This design uses the Template Method pattern, where the base Card class defines the structure, and game-specific classes like BlackJackCard implement the details. This allows easy extension to other card games.
+</Note>
+
+## Implementation
+
+### Suit Enumeration
+
+```python
+from enum import Enum
+
+class Suit(Enum):
+    HEART = 0
+    DIAMOND = 1
+    CLUBS = 2
+    SPADE = 3
+```
+
+### Card Abstract Class
+
+Base class for all cards with abstract value property:
+
+```python
+from abc import ABCMeta, abstractmethod
+
+class Card(metaclass=ABCMeta):
+
+    def __init__(self, value, suit):
+        self.value = value
+        self.suit = suit
+        self.is_available = True
+
+    @property
+    @abstractmethod
+    def value(self):
+        pass
+
+    @value.setter
+    @abstractmethod
+    def value(self, other):
+        pass
+```
+
+### BlackJackCard Class
+
+Implements BlackJack-specific card logic:
+
+```python
+class BlackJackCard(Card):
+
+    def __init__(self, value, suit):
+        super(BlackJackCard, self).__init__(value, suit)
+
+    def is_ace(self):
+        return self._value == 1
+
+    def is_face_card(self):
+        """Jack = 11, Queen = 12, King = 13"""
+        return 10 < self._value <= 13
+
+    @property
+    def value(self):
+        if self.is_ace() == 1:
+            return 1
+        elif self.is_face_card():
+            return 10
+        else:
+            return self._value
+
+    @value.setter
+    def value(self, new_value):
+        if 1 <= new_value <= 13:
+            self._value = new_value
+        else:
+            raise ValueError('Invalid card value: {}'.format(new_value))
+```
+
+### Hand Classes
+
+Generic hand and BlackJack-specific implementation:
+
+```python
+class Hand(object):
+
+    def __init__(self, cards):
+        self.cards = cards
+
+    def add_card(self, card):
+        self.cards.append(card)
+
+    def score(self):
+        total_value = 0
+        for card in self.cards:
+            total_value += card.value
+        return total_value
+
+
+class BlackJackHand(Hand):
+
+    BLACKJACK = 21
+
+    def __init__(self, cards):
+        super(BlackJackHand, self).__init__(cards)
+
+    def score(self):
+        min_over = sys.MAXSIZE
+        max_under = -sys.MAXSIZE
+        for score in self.possible_scores():
+            if self.BLACKJACK < score < min_over:
+                min_over = score
+            elif max_under < score <= self.BLACKJACK:
+                max_under = score
+        return max_under if max_under != -sys.MAXSIZE else min_over
+
+    def possible_scores(self):
+        """Return a list of possible scores, taking Aces into account."""
+        # Implementation handles Ace being worth 1 or 11
+        # ...
+```
+
+### Deck Class
+
+Manages the collection of cards:
+
+```python
+class Deck(object):
+
+    def __init__(self, cards):
+        self.cards = cards
+        self.deal_index = 0
+
+    def remaining_cards(self):
+        return len(self.cards) - self.deal_index
+
+    def deal_card(self):
+        try:
+            card = self.cards[self.deal_index]
+            card.is_available = False
+            self.deal_index += 1
+        except IndexError:
+            return None
+        return card
+
+    def shuffle(self):  # ...
+```
+
+## Key Design Patterns
+
+### Template Method Pattern
+
+The abstract `Card` class defines the structure, with concrete implementations providing game-specific details:
+
+```
+┌──────────────┐
+│     Card     │  (Abstract)
+│  - value     │
+│  - suit      │
+└──────────────┘
+       ↑
+       │ extends
+       │
+┌──────────────┐
+│ BlackJackCard│  (Concrete)
+│  - is_ace()  │
+│  - value: 1-10
+└──────────────┘
+```
+
+### Strategy Pattern
+
+Different scoring strategies for different games:
+
+- **Generic Hand**: Simple sum of card values
+- **BlackJack Hand**: Complex scoring with Ace flexibility (1 or 11)
+
+### Inheritance Hierarchy
+
+```
+Card
+ └── BlackJackCard
+
+Hand
+ └── BlackJackHand
+```
+
+## BlackJack-Specific Features
+
+### Ace Handling
+
+Aces can be worth 1 or 11 in BlackJack. The `BlackJackHand` class calculates all possible scores:
+
+- **Multiple Aces**: Each ace can independently be 1 or 11
+- **Optimal score**: Choose the best score ≤ 21, or the lowest score > 21 if busted
+
+### Face Card Values
+
+Jack, Queen, and King are all worth 10 points:
+
+```python
+def is_face_card(self):
+    return 10 < self._value <= 13
+
+@property
+def value(self):
+    if self.is_ace():
+        return 1  # Can also be 11 in hand calculation
+    elif self.is_face_card():
+        return 10
+    else:
+        return self._value
+```
+
+## Complexity Analysis
+
+| Operation | Time Complexity | Notes |
+|-----------|-----------------|-------|
+| deal_card() | O(1) | Direct array access |
+| add_card() | O(1) | Append to list |
+| score() (generic) | O(n) | Sum of n cards |
+| score() (BlackJack) | O(2^k) | k is number of Aces |
+| shuffle() | O(n) | Fisher-Yates shuffle |
+
+<Note>
+  BlackJack scoring has exponential complexity relative to the number of Aces because it must consider all possible value combinations (1 or 11 for each Ace). However, since a hand typically has at most 4 Aces, this remains practical.
+</Note>
+
+## Design Considerations
+
+### Advantages
+
+- **Extensible**: Easy to add new card games by extending base classes
+- **Reusable**: Generic classes (Card, Hand, Deck) work for multiple games
+- **Type safety**: Abstract properties enforce implementation of game-specific logic
+- **Clear separation**: Game rules in specialized classes, not in base classes
+
+### Extension to Other Games
+
+This design easily extends to other card games:
+
+1. **Poker**: Create `PokerCard` and `PokerHand` with hand ranking logic
+2. **Uno**: Create `UnoCard` with colors and special cards
+3. **Bridge**: Add bidding and trick-taking logic
+
+### Potential Improvements
+
+1. **Card factory**: Create cards using a factory pattern
+2. **Deck initialization**: Auto-populate deck with 52 standard cards
+3. **Multiple decks**: Support games that use multiple decks
+4. **Card images**: Add visual representation of cards
+5. **Game state**: Track game progression, bets, winners
+6. **Player management**: Add player classes with hands and chips
+7. **Shuffle algorithm**: Implement cryptographically secure shuffling for online play

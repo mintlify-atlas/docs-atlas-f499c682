@@ -1,0 +1,422 @@
+---
+title: Design a Web Crawler
+description: Learn how to design a scalable web crawler that indexes billions of pages for search engines
+---
+
+## Overview
+
+Design a web crawler that can index billions of web pages to power search results. This problem explores distributed crawling, duplicate detection, URL prioritization, and building reverse indexes at massive scale.
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **Service** crawls a list of URLs:
+  - Generates reverse index of words to pages containing search terms
+  - Generates titles and snippets for pages
+    - Title and snippets are static, not query-dependent
+- **User** inputs a search term and sees relevant pages with titles and snippets
+  - Only sketch high level components (no need to go into depth)
+- **Service** has high availability
+
+#### Out of Scope
+
+- Search analytics
+- Personalized search results
+- Page rank
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+  - Some searches are very popular, others executed once
+- Support only anonymous users
+- Generating search results should be fast
+- The web crawler should not get stuck in infinite loops
+  - Cycles in the graph must be detected
+- 1 billion links to crawl
+- Pages need regular crawling for freshness
+  - Average refresh rate: once per week
+  - More frequent for popular sites
+  - 4 billion links crawled each month
+- Average stored size per page: 500 KB
+- 100 billion searches per month
+
+<Note>
+Exercise traditional systems design - don't use existing solutions like Solr or Nutch.
+</Note>
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Storage:**
+- 2 PB of stored page content per month
+  - 500 KB per page × 4 billion links crawled per month
+- 72 PB of stored page content in 3 years
+
+**Throughput:**
+- 1,600 write requests per second
+- 40,000 search requests per second
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Web Crawler High Level Design](http://i.imgur.com/xjdAAUv.png)
+
+## Step 3: Core Components
+
+### Use Case: Service Crawls URLs
+
+Assume we have an initial list of `links_to_crawl` ranked by overall site popularity. If not available, seed with popular sites like Yahoo, DMOZ, etc.
+
+<Steps>
+
+<Step title="Initialize data stores">
+  - `links_to_crawl` - Ranked links to process (NoSQL with Redis sorted sets)
+  - `crawled_links` - Processed links with page signatures (NoSQL Database)
+</Step>
+
+<Step title="Crawler Service processes links">
+  In a loop, the Crawler Service:
+  - Takes the top ranked page link
+  - Checks `crawled_links` for similar page signature
+  - If similar page exists, reduces priority (prevents cycles)
+  - Else, crawls the link:
+    - Adds job to Reverse Index Service queue
+    - Adds job to Document Service queue for title/snippet
+    - Generates page signature
+    - Removes from `links_to_crawl`
+    - Inserts into `crawled_links`
+</Step>
+
+</Steps>
+
+#### Implementation Components
+
+<Accordion title="PagesDataStore class">
+
+```python
+class PagesDataStore(object):
+
+    def __init__(self, db):
+        self.db = db
+
+    def add_link_to_crawl(self, url):
+        """Add the given link to `links_to_crawl`."""
+        ...
+
+    def remove_link_to_crawl(self, url):
+        """Remove the given link from `links_to_crawl`."""
+        ...
+
+    def reduce_priority_link_to_crawl(self, url):
+        """Reduce the priority of a link to avoid cycles."""
+        ...
+
+    def extract_max_priority_page(self):
+        """Return the highest priority link in `links_to_crawl`."""
+        ...
+
+    def insert_crawled_link(self, url, signature):
+        """Add the given link to `crawled_links`."""
+        ...
+
+    def crawled_similar(self, signature):
+        """Determine if we've crawled a page matching the signature."""
+        ...
+```
+
+</Accordion>
+
+<Accordion title="Page class">
+
+```python
+class Page(object):
+
+    def __init__(self, url, contents, child_urls, signature):
+        self.url = url
+        self.contents = contents
+        self.child_urls = child_urls
+        self.signature = signature
+```
+
+</Accordion>
+
+<Accordion title="Crawler class">
+
+```python
+class Crawler(object):
+
+    def __init__(self, data_store, reverse_index_queue, doc_index_queue):
+        self.data_store = data_store
+        self.reverse_index_queue = reverse_index_queue
+        self.doc_index_queue = doc_index_queue
+
+    def create_signature(self, page):
+        """Create signature based on url and contents."""
+        ...
+
+    def crawl_page(self, page):
+        for url in page.child_urls:
+            self.data_store.add_link_to_crawl(url)
+        page.signature = self.create_signature(page)
+        self.data_store.remove_link_to_crawl(page.url)
+        self.data_store.insert_crawled_link(page.url, page.signature)
+
+    def crawl(self):
+        while True:
+            page = self.data_store.extract_max_priority_page()
+            if page is None:
+                break
+            if self.data_store.crawled_similar(page.signature):
+                self.data_store.reduce_priority_link_to_crawl(page.url)
+            else:
+                self.crawl_page(page)
+```
+
+</Accordion>
+
+### Handling Duplicates
+
+<Warning>
+The crawler must not get stuck in infinite loops when graphs contain cycles.
+</Warning>
+
+#### Removing Duplicate URLs
+
+<Tabs>
+  <Tab title="Small Lists">
+    Use `sort | unique` for smaller datasets
+  </Tab>
+  <Tab title="Large Scale (1B links)">
+    Use MapReduce to output only entries with frequency of 1
+
+    ```python
+    class RemoveDuplicateUrls(MRJob):
+
+        def mapper(self, _, line):
+            yield line, 1
+
+        def reducer(self, key, values):
+            total = sum(values)
+            if total == 1:
+                yield key, total
+    ```
+  </Tab>
+</Tabs>
+
+#### Detecting Duplicate Content
+
+More complex than URL deduplication. Generate signatures based on page contents and compare for similarity:
+
+- **Jaccard index** - Measures similarity between sets
+- **Cosine similarity** - Measures similarity between vectors
+
+### Determining Crawl Frequency
+
+<AccordionGroup>
+
+<Accordion title="Default Policy">
+Pages should have a `timestamp` field. Default refresh period: one week.
+</Accordion>
+
+<Accordion title="Popular Sites">
+Frequently updated or popular sites should be refreshed more often.
+</Accordion>
+
+<Accordion title="Data Mining Approach">
+Analyze historical data to determine mean time before page updates, then use that statistic for crawl frequency.
+</Accordion>
+
+<Accordion title="Robots.txt Support">
+Support `Robots.txt` file to give webmasters control over crawl frequency.
+</Accordion>
+
+</AccordionGroup>
+
+### Use Case: User Searches Keywords
+
+<Steps>
+
+<Step title="Client sends request">
+  The Client sends a request to the Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Query API">
+  The Web Server forwards to the Query API server
+</Step>
+
+<Step title="Query API processes search">
+  The Query API server:
+  - Parses the query (remove markup, tokenize, fix typos, normalize)
+  - Uses Reverse Index Service to find matching documents
+  - Reverse Index Service ranks and returns top results
+  - Uses Document Service to return titles and snippets
+</Step>
+
+</Steps>
+
+**REST API:**
+
+```bash
+curl https://search.com/api/v1/search?query=hello+world
+```
+
+**Response:**
+
+```json
+[
+  {
+    "title": "foo's title",
+    "snippet": "foo's snippet",
+    "link": "https://foo.com"
+  },
+  {
+    "title": "bar's title",
+    "snippet": "bar's snippet",
+    "link": "https://bar.com"
+  }
+]
+```
+
+## Step 4: Scale the Design
+
+![Web Crawler Scaled Design](http://i.imgur.com/bWxPtQA.png)
+
+<Warning>
+**Important:** Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks while evaluating alternatives
+4. Repeat
+</Warning>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across web servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Horizontal scaling as reverse proxies
+</Card>
+
+<Card title="API Servers" icon="code">
+Application layer for business logic
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Cache popular queries (Redis/Memcached)
+- Reduces load on Reverse Index and Document Services
+- Handles unevenly distributed traffic
+- Handles traffic spikes
+</Card>
+
+<Card title="NoSQL Database" icon="table">
+Store links to crawl and crawled links
+</Card>
+
+</CardGroup>
+
+### Crawling Service Optimizations
+
+<AccordionGroup>
+
+<Accordion title="Reverse Index & Document Service">
+**Challenge:** Handle massive data size and request load.
+
+**Solutions:**
+- Heavy use of sharding
+- Heavy use of federation
+</Accordion>
+
+<Accordion title="DNS Lookup Optimization">
+**Challenge:** DNS lookup can be a bottleneck.
+
+**Solution:** Crawler Service keeps its own DNS lookup cache, refreshed periodically.
+</Accordion>
+
+<Accordion title="Connection Pooling">
+**Challenge:** Opening/closing connections is expensive.
+
+**Solution:** 
+- Keep many open connections simultaneously
+- Consider switching to UDP for performance boost
+</Accordion>
+
+<Accordion title="Bandwidth Management">
+**Challenge:** Web crawling is bandwidth intensive.
+
+**Solution:** Ensure sufficient bandwidth to sustain high throughput.
+</Accordion>
+
+</AccordionGroup>
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/web_crawler">
+  View the complete Python implementation including crawler logic and MapReduce jobs.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="SQL Scaling Patterns" icon="database">
+- Read replicas
+- Federation
+- Sharding
+- Denormalization
+- SQL Tuning
+</Card>
+
+<Card title="NoSQL Options" icon="table">
+- Key-value store
+- Document store
+- Wide column store
+- Graph database
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **Cycle detection** is critical to avoid infinite loops
+- **Page signatures** enable duplicate detection
+- **Priority queue** (Redis sorted sets) manages crawl order
+- **MapReduce** handles deduplication at scale
+- **Memory Cache** serves popular search queries
+- **Distributed architecture** required for billions of pages
+- **Connection pooling** improves crawler performance
+- Consider **Robots.txt** for respectful crawling

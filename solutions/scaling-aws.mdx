@@ -1,0 +1,557 @@
+---
+title: Design a System that Scales to Millions on AWS
+description: Learn how to iteratively scale a basic web application to millions of users on AWS with load balancing, caching, and database replication
+---
+
+## Overview
+
+Design a system that evolves from serving a single user to millions of users on AWS. This problem demonstrates the **iterative approach to scaling**, starting with a simple single-server setup and progressively adding components as bottlenecks emerge.
+
+<Note>
+While this uses AWS-specific services, **the principles apply generally to any cloud provider or on-premise infrastructure**.
+</Note>
+
+## Iterative Scaling Approach
+
+Scaling requires a methodical approach:
+
+<Steps>
+
+<Step title="Benchmark/Load Test">
+  Measure current system performance under load
+</Step>
+
+<Step title="Profile for Bottlenecks">
+  Identify specific components causing performance issues
+</Step>
+
+<Step title="Address Bottlenecks">
+  Evaluate alternatives and trade-offs, implement solutions
+</Step>
+
+<Step title="Repeat">
+  Continuously iterate as system grows
+</Step>
+
+</Steps>
+
+<Warning>
+**Important:** This iterative pattern is good practice for evolving basic designs to scalable designs. Never jump directly to the final architecture!
+</Warning>
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** makes a read or write request
+  - **Service** processes request, stores user data, returns results
+- **Service** needs to evolve from small user base to millions of users
+  - Discuss general scaling patterns for large number of users and requests
+- **Service** has high availability
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+- Need for relational data
+- Scale from 1 user to tens of millions of users
+  - Denote increase as: Users+, Users++, Users+++, etc.
+- 10 million users
+- 1 billion writes per month
+- 100 billion reads per month
+- 100:1 read to write ratio
+- 1 KB content per write
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Storage:**
+- 1 TB of new content per month
+  - 1 KB per write × 1 billion writes per month
+- 36 TB of new content in 3 years
+
+**Throughput:**
+- 400 writes per second on average
+- 40,000 reads per second on average
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: Initial Design - Single Server
+
+![Single Server Design](http://i.imgur.com/B8LDKD7.png)
+
+### Goals (1-2 Users)
+
+- Start simple with single box
+- Vertical scaling when needed
+- Monitor to determine bottlenecks
+
+### Components
+
+<CardGroup cols={2}>
+
+<Card title="Web Server" icon="server">
+EC2 instance handling all requests
+</Card>
+
+<Card title="MySQL Database" icon="database">
+Stored on same EC2 instance
+</Card>
+
+<Card title="Elastic IP" icon="network-wired">
+Public static IP that doesn't change on reboot
+</Card>
+
+<Card title="DNS" icon="globe">
+Route 53 maps domain to instance public IP
+</Card>
+
+</CardGroup>
+
+### Vertical Scaling
+
+<AccordionGroup>
+
+<Accordion title="Advantages">
+- Simple to implement
+- Choose bigger instance size as needed
+</Accordion>
+
+<Accordion title="Monitoring">
+Use CloudWatch, top, nagios, statsd, graphite to monitor:
+- CPU usage
+- Memory usage
+- I/O
+- Network
+</Accordion>
+
+<Accordion title="Disadvantages">
+- Can get very expensive
+- No redundancy/failover
+- Limited by single machine capacity
+</Accordion>
+
+</AccordionGroup>
+
+### Security
+
+<Tabs>
+  <Tab title="Open Ports">
+    - 80 for HTTP
+    - 443 for HTTPS
+    - 22 for SSH (whitelisted IPs only)
+  </Tab>
+  <Tab title="Restrictions">
+    - Prevent web server from initiating outbound connections
+    - Apply principle of least privilege
+  </Tab>
+</Tabs>
+
+### SQL vs NoSQL
+
+Start with **MySQL Database** given relational data requirement.
+
+<Note>
+Discuss [SQL vs NoSQL tradeoffs](https://github.com/donnemartin/system-design-primer#sql-or-nosql) based on specific use case.
+</Note>
+
+## Step 3: Users+ - Separate Components
+
+![Separate Components](http://i.imgur.com/rrfjMXB.png)
+
+### Bottleneck Analysis
+
+**Problem:** Single box becoming overwhelmed
+- MySQL taking more memory and CPU
+- User content filling disk space
+- Vertical scaling expensive
+- Cannot scale MySQL and Web Server independently
+
+### Goals
+
+<Steps>
+
+<Step title="Lighten load on single box">
+  Separate concerns for independent scaling
+</Step>
+
+<Step title="Store static content separately">
+  Move to Object Store (S3)
+</Step>
+
+<Step title="Move database to separate box">
+  Use RDS for managed MySQL
+</Step>
+
+</Steps>
+
+### New Components
+
+<AccordionGroup>
+
+<Accordion title="Object Store (S3)">
+**Store static content:**
+- User files
+- JavaScript
+- CSS
+- Images
+- Videos
+
+**Benefits:**
+- Highly scalable and reliable
+- Server-side encryption
+</Accordion>
+
+<Accordion title="RDS MySQL">
+**Managed database service:**
+- Simple to administer and scale
+- Multiple availability zones
+- Encryption at rest
+- Automatic backups
+</Accordion>
+
+<Accordion title="Virtual Private Cloud (VPC)">
+**Network isolation:**
+- Public subnet for Web Server (internet-facing)
+- Private subnet for database and other internal services
+- Security groups control access between components
+</Accordion>
+
+</AccordionGroup>
+
+### Trade-offs
+
+- **Increased complexity** - Need to update Web Server to point to S3 and RDS
+- **Additional security** - Must secure new components
+- **Higher AWS costs** - Weigh against managing similar systems yourself
+
+## Step 4: Users++ - Horizontal Scaling
+
+![Horizontal Scaling](http://i.imgur.com/raoFTXM.png)
+
+### Bottleneck Analysis
+
+**Problem:** Single Web Server bottlenecks during peak hours
+- Slow responses
+- Occasional downtime
+- Need higher availability and redundancy
+
+### Goals
+
+<CardGroup cols={2}>
+
+<Card title="Load Balancer" icon="scale-balanced">
+ELB distributes traffic across multiple Web Servers
+- Highly available
+- Terminate SSL to reduce backend load
+- Simplify certificate administration
+</Card>
+
+<Card title="Multiple Web Servers" icon="server">
+Spread across multiple availability zones
+- Horizontal scaling
+- Remove single points of failure
+</Card>
+
+<Card title="MySQL Failover" icon="database">
+Master-Slave replication across AZs
+- Improve redundancy
+- Enable read scaling
+</Card>
+
+<Card title="Application Servers" icon="code">
+Separate from Web Servers
+- Independent scaling
+- Web Servers act as reverse proxy
+- Separate Read APIs from Write APIs
+</Card>
+
+</CardGroup>
+
+### Content Delivery Network (CDN)
+
+<Tabs>
+  <Tab title="CloudFront">
+    - Serve static content globally
+    - Reduce latency
+    - Reduce load on origin servers
+  </Tab>
+  <Tab title="Dynamic Content">
+    - Some dynamic content can also be cached
+    - Configure appropriate TTLs
+  </Tab>
+</Tabs>
+
+## Step 5: Users+++ - Caching Layer
+
+![Caching Layer](http://i.imgur.com/OZCxJr0.png)
+
+<Note>
+**Note:** Internal Load Balancers not shown to reduce clutter
+</Note>
+
+### Bottleneck Analysis
+
+**Problem:** Read-heavy system (100:1 ratio)
+- Database suffering from high read requests
+- Poor performance from cache misses
+
+### Goals
+
+Add **Memory Cache** (Elasticache) to reduce load and latency:
+
+<AccordionGroup>
+
+<Accordion title="Frequently Accessed Content">
+**Cache from MySQL:**
+- Try configuring MySQL Database cache first
+- If insufficient, implement Memory Cache
+</Accordion>
+
+<Accordion title="Session Data">
+**Store from Web Servers:**
+- Makes Web Servers stateless
+- Enables Autoscaling
+</Accordion>
+
+<Accordion title="Performance">
+Reading 1 MB sequentially from memory: ~250 microseconds
+- 4x faster than SSD
+- 80x faster than disk
+</Accordion>
+
+</AccordionGroup>
+
+### MySQL Read Replicas
+
+<Steps>
+
+<Step title="Add Read Replicas">
+  Relieve load on MySQL Write Master
+</Step>
+
+<Step title="Separate Read/Write Logic">
+  Update Web Server to route appropriately
+</Step>
+
+<Step title="Add Load Balancers">
+  Distribute reads across replicas
+</Step>
+
+</Steps>
+
+<Note>
+Most services are read-heavy vs write-heavy, making this pattern very effective.
+</Note>
+
+### Additional Scaling
+
+- Add more **Web Servers** to improve responsiveness
+- Add more **Application Servers** for business logic
+
+## Step 6: Users++++ - Autoscaling
+
+![Autoscaling](http://i.imgur.com/3X8nmdL.png)
+
+### Bottleneck Analysis
+
+**Problem:** Traffic spikes during business hours
+- Want to automatically scale up/down based on load
+- Reduce costs by powering down unused instances
+- Automate DevOps as much as possible
+
+### AWS Autoscaling
+
+<AccordionGroup>
+
+<Accordion title="Configuration">
+**Setup:**
+- Create one group for each Web Server type
+- Create one group for each Application Server type
+- Place each group in multiple availability zones
+- Set min and max number of instances
+</Accordion>
+
+<Accordion title="Scaling Triggers">
+**CloudWatch metrics:**
+- Simple time of day for predictable loads
+- OR metrics over time period:
+  - CPU load
+  - Latency
+  - Network traffic
+  - Custom metrics
+</Accordion>
+
+<Accordion title="Disadvantages">
+- Introduces complexity
+- Takes time to scale up to meet increased demand
+- Takes time to scale down when demand drops
+</Accordion>
+
+</AccordionGroup>
+
+### DevOps Automation
+
+<Tabs>
+  <Tab title="Configuration Management">
+    - Chef
+    - Puppet
+    - Ansible
+  </Tab>
+  <Tab title="Monitoring">
+    - Host level: Single EC2 instance
+    - Aggregate level: Load balancer stats
+    - Log analysis: CloudWatch, CloudTrail, Loggly, Splunk, Sumo
+    - External monitoring: Pingdom, New Relic
+    - Notifications: PagerDuty
+    - Error reporting: Sentry
+  </Tab>
+</Tabs>
+
+## Step 7: Users+++++ - Advanced Scaling
+
+![Advanced Scaling](http://i.imgur.com/jj3A5N8.png)
+
+<Note>
+**Note:** Autoscaling groups not shown to reduce clutter
+</Note>
+
+### Continued Scaling Challenges
+
+As service grows towards constraints, continue iterative scaling:
+
+### Database Scaling
+
+<Warning>
+**Challenges:**
+- Database growing too large
+- 40,000 average read requests/second overwhelming replicas
+- 400 average writes/second may overwhelm single Write Master
+</Warning>
+
+**Solutions:**
+
+<AccordionGroup>
+
+<Accordion title="Data Warehousing">
+**Strategy:** Store limited time period in MySQL, rest in Redshift
+
+**Benefit:** Redshift handles 1 TB/month constraint comfortably
+</Accordion>
+
+<Accordion title="SQL Scaling Patterns">
+- **Federation** - Split databases by function
+- **Sharding** - Distribute data across databases
+- **Denormalization** - Optimize read performance
+- **SQL Tuning** - Optimize queries and indexes
+</Accordion>
+
+<Accordion title="NoSQL Database">
+**Consider DynamoDB for:**
+- High read/write throughput requirements
+- Flexible schema needs
+- Key-value or document data models
+</Accordion>
+
+</AccordionGroup>
+
+### Asynchronous Processing
+
+Separate **Application Servers** for batch processes:
+
+<Steps>
+
+<Step title="Client uploads data">
+  Example: Photo upload in photo service
+</Step>
+
+<Step title="Application Server queues job">
+  Places job in Queue (SQS)
+</Step>
+
+<Step title="Worker Service processes">
+  EC2 or Lambda pulls from Queue:
+  - Performs computation (create thumbnail)
+  - Updates Database
+  - Stores result in Object Store
+</Step>
+
+</Steps>
+
+### Memory Cache Scaling
+
+<Tabs>
+  <Tab title="Popular Content">
+    Scale Memory Cache to handle traffic for popular content
+  </Tab>
+  <Tab title="Traffic Spikes">
+    Cache helps handle unevenly distributed traffic
+  </Tab>
+  <Tab title="Read Replicas">
+    Still needed to handle cache misses
+  </Tab>
+</Tabs>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="SQL Scaling Patterns" icon="database">
+- Read replicas
+- Federation
+- Sharding
+- Denormalization
+- SQL Tuning
+</Card>
+
+<Card title="NoSQL Options" icon="table">
+- Key-value store
+- Document store
+- Wide column store
+- Graph database
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Client caching
+- CDN caching
+- Web server caching
+- Database caching
+- Application caching
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **Iterative approach** is essential for scaling
+  - Benchmark → Profile → Address → Repeat
+- **Start simple** with single server
+- **Separate concerns** for independent scaling
+- **Horizontal scaling** with Load Balancer and multiple servers
+- **Caching layer** critical for read-heavy workloads
+- **Autoscaling** handles traffic variability
+- **Database scaling** requires multiple strategies
+- **Asynchronous processing** separates real-time from batch work
+- **Monitoring** at every stage identifies bottlenecks
+- **Security** must evolve with architecture
+
+<Warning>
+Scaling is an iterative process. Continue benchmarking and monitoring to address bottlenecks as they arise.
+</Warning>

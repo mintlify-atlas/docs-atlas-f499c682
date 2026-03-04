@@ -1,0 +1,97 @@
+---
+title: 'How to Approach a System Design Interview'
+description: 'Learn the 4-step process to tackle system design interview questions effectively'
+---
+
+The system design interview is an **open-ended conversation**. You are expected to lead it.
+
+You can use the following steps to guide the discussion. To help solidify this process, work through common system design interview questions using the following framework.
+
+<Steps>
+
+<Step title="Outline use cases, constraints, and assumptions">
+
+Gather requirements and scope the problem. Ask questions to clarify use cases and constraints. Discuss assumptions.
+
+**Key questions to ask:**
+
+- Who is going to use it?
+- How are they going to use it?
+- How many users are there?
+- What does the system do?
+- What are the inputs and outputs of the system?
+- How much data do we expect to handle?
+- How many requests per second do we expect?
+- What is the expected read to write ratio?
+
+<Tip>
+Start by clearly defining the problem scope. This prevents you from solving the wrong problem and demonstrates your ability to gather requirements.
+</Tip>
+
+</Step>
+
+<Step title="Create a high level design">
+
+Outline a high level design with all important components.
+
+**What to include:**
+
+- Sketch the main components and connections
+- Justify your ideas
+
+<Tip>
+Focus on the big picture first. You'll dive into details in the next step. Use simple boxes and arrows to show how components interact.
+</Tip>
+
+</Step>
+
+<Step title="Design core components">
+
+Dive into details for each core component. For example, if you were asked to design a URL shortening service, discuss:
+
+**Example considerations:**
+
+- Generating and storing a hash of the full URL
+  - MD5 and Base62 encoding
+  - Hash collisions
+  - SQL or NoSQL
+  - Database schema
+- Translating a hashed URL to the full URL
+  - Database lookup
+- API and object-oriented design
+
+<Tip>
+This is where you demonstrate deep technical knowledge. Be prepared to discuss trade-offs between different approaches.
+</Tip>
+
+</Step>
+
+<Step title="Scale the design">
+
+Identify and address bottlenecks, given the constraints. For example, do you need the following to address scalability issues?
+
+**Common scaling solutions:**
+
+- Load balancer
+- Horizontal scaling
+- Caching
+- Database sharding
+
+Discuss potential solutions and trade-offs. **Everything is a trade-off.** Address bottlenecks using principles of scalable system design.
+
+<Tip>
+Don't just add components - explain why each scaling solution is necessary and what problems it solves. Discuss the trade-offs of each approach.
+</Tip>
+
+</Step>
+
+</Steps>
+
+## Additional Resources
+
+Check out the following links to get a better idea of what to expect:
+
+- [How to ace a systems design interview](https://web.archive.org/web/20210505130322/https://www.palantir.com/2011/10/how-to-rock-a-systems-design-interview/)
+- [The system design interview](http://www.hiredintech.com/system-design)
+- [Intro to Architecture and Systems Design Interviews](https://www.youtube.com/watch?v=ZgdS0EUmn70)
+- [System design template](https://leetcode.com/discuss/career/229177/My-System-Design-Template)

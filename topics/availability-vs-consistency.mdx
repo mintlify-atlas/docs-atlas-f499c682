@@ -1,0 +1,96 @@
+---
+title: Availability vs consistency
+description: Understanding the CAP theorem and trade-offs between availability and consistency in distributed systems
+---
+
+## CAP theorem
+
+<img src="https://raw.githubusercontent.com/donnemartin/system-design-primer/master/images/bgLMI2u.png" alt="CAP Theorem" />
+
+*Source: [CAP theorem revisited](https://robertgreiner.com/cap-theorem-revisited)*
+
+In a distributed computer system, you can only support two of the following guarantees:
+
+- **Consistency** - Every read receives the most recent write or an error
+- **Availability** - Every request receives a response, without guarantee that it contains the most recent version of the information
+- **Partition Tolerance** - The system continues to operate despite arbitrary partitioning due to network failures
+
+<Warning>
+Networks aren't reliable, so you'll need to support partition tolerance. You'll need to make a software tradeoff between consistency and availability.
+</Warning>
+
+## CP - consistency and partition tolerance
+
+Waiting for a response from the partitioned node might result in a timeout error. CP is a good choice if your business needs require atomic reads and writes.
+
+### When to choose CP
+
+CP systems sacrifice availability for consistency. Choose CP when:
+
+- Your business requirements demand atomic reads and writes
+- Data accuracy is more important than system availability
+- You need to prevent conflicting updates
+
+### Examples of CP systems
+
+- Banking and financial systems
+- Systems requiring strong consistency guarantees
+- MongoDB (configurable)
+- HBase
+- Redis (when configured for strong consistency)
+
+## AP - availability and partition tolerance
+
+Responses return the most readily available version of the data available on any node, which might not be the latest. Writes might take some time to propagate when the partition is resolved.
+
+AP is a good choice if the business needs allow for [eventual consistency](/topics/consistency-patterns#eventual-consistency) or when the system needs to continue working despite external errors.
+
+### When to choose AP
+
+AP systems sacrifice consistency for availability. Choose AP when:
+
+- System availability is more critical than data consistency
+- Eventual consistency is acceptable for your use case
+- You need the system to continue operating during network partitions
+
+### Examples of AP systems
+
+- Social media feeds
+- DNS
+- Caching systems
+- Cassandra
+- DynamoDB (default configuration)
+- CouchDB
+
+<Info>
+Most modern distributed systems aim for "eventual consistency" - they choose availability over immediate consistency but ensure data converges to a consistent state eventually.
+</Info>
+
+## Real-world considerations
+
+In practice, the CAP theorem is more nuanced:
+
+1. **Partitions are rare**: Network partitions don't happen constantly, so you don't always have to choose
+2. **Tunable consistency**: Many modern databases offer tunable consistency levels
+3. **Different guarantees for different operations**: Some systems provide different guarantees for different types of operations
+
+<Note>
+The CAP theorem describes trade-offs during network partitions. When there are no partitions, you can have both consistency and availability.
+</Note>
+
+## Making the choice
+
+Questions to ask when choosing between CP and AP:
+
+1. Can your application tolerate stale data?
+2. Is it acceptable for some users to see different versions of data temporarily?
+3. What happens if the system becomes unavailable during a partition?
+4. Do you need transactions that span multiple operations?
+5. What are the business consequences of inconsistent data?
+
+## Additional resources
+
+- [CAP theorem revisited](https://robertgreiner.com/cap-theorem-revisited/)
+- [A plain english introduction to CAP theorem](http://ksat.me/a-plain-english-introduction-to-cap-theorem)
+- [CAP FAQ](https://github.com/henryr/cap-faq)
+- [The CAP theorem](https://www.youtube.com/watch?v=k-Yaq8AHlFA)

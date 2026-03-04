@@ -1,0 +1,133 @@
+---
+title: Design a Hash Map
+description: Implement a hash map with collision resolution using chaining
+---
+
+## Problem Statement
+
+Design and implement a hash map data structure that supports key-value storage with collision resolution.
+
+## Constraints and Assumptions
+
+- Keys are integers only
+- Use chaining for collision resolution
+- No need to worry about load factors
+- Inputs are valid (no validation needed)
+- The data structure fits in memory
+
+## Design Overview
+
+The hash map implementation uses two classes:
+
+1. **Item**: Represents a key-value pair
+2. **HashTable**: The main hash map structure with chaining for collisions
+
+<Note>
+  This implementation uses separate chaining to handle collisions, where each bucket in the hash table contains a list of items. This is a simple and effective approach for handling collisions without requiring complex rehashing logic.
+</Note>
+
+## Implementation
+
+### Item Class
+
+The `Item` class is a simple container for storing key-value pairs:
+
+```python
+class Item(object):
+
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+```
+
+### HashTable Class
+
+The main hash table implementation:
+
+```python
+class HashTable(object):
+
+    def __init__(self, size):
+        self.size = size
+        self.table = [[] for _ in range(self.size)]
+
+    def _hash_function(self, key):
+        return key % self.size
+
+    def set(self, key, value):
+        hash_index = self._hash_function(key)
+        for item in self.table[hash_index]:
+            if item.key == key:
+                item.value = value
+                return
+        self.table[hash_index].append(Item(key, value))
+
+    def get(self, key):
+        hash_index = self._hash_function(key)
+        for item in self.table[hash_index]:
+            if item.key == key:
+                return item.value
+        raise KeyError('Key not found')
+
+    def remove(self, key):
+        hash_index = self._hash_function(key)
+        for index, item in enumerate(self.table[hash_index]):
+            if item.key == key:
+                del self.table[hash_index][index]
+                return
+        raise KeyError('Key not found')
+```
+
+## Key Design Patterns
+
+### Separate Chaining
+
+Each bucket in the hash table contains a list (chain) of items. When multiple keys hash to the same index, they are stored in the same list:
+
+- **Collision handling**: O(n) worst case, where n is the number of items in a bucket
+- **Space efficient**: Only uses space for actual items stored
+- **Simple implementation**: Easy to understand and maintain
+
+### Hash Function
+
+The implementation uses a simple modulo hash function:
+
+```python
+def _hash_function(self, key):
+    return key % self.size
+```
+
+This distributes keys across the available buckets based on the table size.
+
+## Complexity Analysis
+
+| Operation | Average Case | Worst Case |
+|-----------|--------------|------------|
+| set()     | O(1)         | O(n)       |
+| get()     | O(1)         | O(n)       |
+| remove()  | O(1)         | O(n)       |
+
+<Note>
+  The worst case occurs when all keys hash to the same bucket, resulting in a linear search through the chain. In practice, with a good hash function and appropriate table size, operations approach O(1) average time complexity.
+</Note>
+
+## Design Considerations
+
+### Advantages
+
+- Simple and straightforward implementation
+- No need for complex rehashing or probing logic
+- Chains can grow dynamically without table resizing
+
+### Trade-offs
+
+- **No load factor management**: The implementation doesn't resize the table when it becomes too full, which could lead to longer chains and degraded performance
+- **Fixed size**: Table size is determined at initialization and never changes
+- **Integer keys only**: Limited to integer keys for simplicity
+
+### Potential Improvements
+
+1. **Dynamic resizing**: Implement load factor checking and table resizing when threshold is exceeded
+2. **Better hash functions**: Use more sophisticated hashing for better distribution
+3. **Generic keys**: Support any hashable object as a key
+4. **Balanced structures**: Replace lists with balanced trees for worst-case O(log n) lookups

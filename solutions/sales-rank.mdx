@@ -1,0 +1,410 @@
+---
+title: Design Amazon's Sales Ranking by Category
+description: Learn how to design Amazon's sales ranking feature that calculates and displays top products by category with billions of transactions
+---
+
+## Overview
+
+Design Amazon's sales ranking system that calculates and displays the most popular products by category. This problem explores MapReduce for batch processing, real-time analytics, ranking algorithms, and scaling to handle billions of transactions per month.
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **Service** calculates the past week's most popular products by category
+- **User** views the past week's most popular products by category
+- **Service** has high availability
+
+#### Out of Scope
+
+- The general e-commerce site
+  - Design components only for calculating sales rank
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+- Items can be in multiple categories
+- Items cannot change categories
+- No subcategories (e.g., `foo/bar/baz`)
+- Results must be updated hourly
+  - More popular products might need more frequent updates
+- 10 million products
+- 1,000 categories
+- 1 billion transactions per month
+- 100 billion read requests per month
+- 100:1 read to write ratio
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Size per transaction:**
+- `created_at` - 5 bytes
+- `product_id` - 8 bytes
+- `category_id` - 4 bytes
+- `seller_id` - 8 bytes
+- `buyer_id` - 8 bytes
+- `quantity` - 4 bytes
+- `total_price` - 5 bytes
+- **Total: ~40 bytes**
+
+**Storage:**
+- 40 GB of new transaction content per month
+  - 40 bytes per transaction × 1 billion transactions per month
+- 1.44 TB of new transaction content in 3 years
+
+**Throughput:**
+- 400 transactions per second on average
+- 40,000 read requests per second on average
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Sales Rank High Level Design](http://i.imgur.com/vwMa1Qu.png)
+
+## Step 3: Core Components
+
+### Use Case: Service Calculates Weekly Rankings
+
+Store raw **Sales API** server log files on Object Store (Amazon S3) rather than managing distributed file system.
+
+#### Log File Format
+
+**Sample log entry (tab delimited):**
+
+```
+timestamp   product_id  category_id    qty     total_price   seller_id    buyer_id
+t1          product1    category1      2       20.00         1            1
+t2          product1    category2      2       20.00         2            2
+t2          product1    category2      1       10.00         2            3
+t3          product2    category1      3        7.00         3            4
+t4          product3    category2      7        2.00         4            5
+t5          product4    category1      1        5.00         5            6
+```
+
+### MapReduce Implementation
+
+The **Sales Rank Service** uses multi-step MapReduce:
+
+<Steps>
+
+<Step title="Step 1: Transform and Aggregate">
+  Transform data to `(category, product_id), sum(quantity)`
+</Step>
+
+<Step title="Step 2: Distributed Sort">
+  Perform distributed sort to rank products within categories
+</Step>
+
+<Step title="Step 3: Write to Database">
+  Insert sorted results into `sales_rank` table in SQL Database
+</Step>
+
+</Steps>
+
+<Accordion title="MapReduce implementation">
+
+```python
+class SalesRanker(MRJob):
+
+    def within_past_week(self, timestamp):
+        """Return True if timestamp is within past week, False otherwise."""
+        ...
+
+    def mapper(self, _, line):
+        """Parse each log line, extract and transform relevant lines.
+
+        Emit key value pairs of the form:
+
+        (category1, product1), 2
+        (category2, product1), 2
+        (category2, product1), 1
+        (category1, product2), 3
+        (category2, product3), 7
+        (category1, product4), 1
+        """
+        timestamp, product_id, category_id, quantity, total_price, seller_id, \
+            buyer_id = line.split('\t')
+        if self.within_past_week(timestamp):
+            yield (category_id, product_id), quantity
+
+    def reducer(self, key, values):
+        """Sum values for each key.
+
+        (category1, product1), 2
+        (category2, product1), 3
+        (category1, product2), 3
+        (category2, product3), 7
+        (category1, product4), 1
+        """
+        yield key, sum(values)
+
+    def mapper_sort(self, key, value):
+        """Construct key to ensure proper sorting.
+
+        Transform key and value to the form:
+
+        (category1, 2), product1
+        (category2, 3), product1
+        (category1, 3), product2
+        (category2, 7), product3
+        (category1, 1), product4
+
+        The shuffle/sort step of MapReduce will then do a
+        distributed sort on the keys, resulting in:
+
+        (category1, 1), product4
+        (category1, 2), product1
+        (category1, 3), product2
+        (category2, 3), product1
+        (category2, 7), product3
+        """
+        category_id, product_id = key
+        quantity = value
+        yield (category_id, quantity), product_id
+
+    def reducer_identity(self, key, value):
+        yield key, value
+
+    def steps(self):
+        """Run the map and reduce steps."""
+        return [
+            self.mr(mapper=self.mapper,
+                    reducer=self.reducer),
+            self.mr(mapper=self.mapper_sort,
+                    reducer=self.reducer_identity),
+        ]
+```
+
+</Accordion>
+
+#### MapReduce Output
+
+Sorted list ready for insertion into `sales_rank` table:
+
+```
+(category1, 1), product4
+(category1, 2), product1
+(category1, 3), product2
+(category2, 3), product1
+(category2, 7), product3
+```
+
+### Database Schema
+
+**sales_rank table:**
+
+```sql
+id int NOT NULL AUTO_INCREMENT
+category_id int NOT NULL
+total_sold int NOT NULL
+product_id int NOT NULL
+PRIMARY KEY(id)
+FOREIGN KEY(category_id) REFERENCES Categories(id)
+FOREIGN KEY(product_id) REFERENCES Products(id)
+```
+
+<Note>
+Indexes on `id`, `category_id`, and `product_id` speed up lookups (log-time vs full table scan) and keep data in memory.
+</Note>
+
+### Use Case: User Views Popular Products
+
+<Steps>
+
+<Step title="Client sends request">
+  Client sends request to Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Read API">
+  Web Server forwards to Read API server
+</Step>
+
+<Step title="Read API queries database">
+  Read API reads from SQL Database `sales_rank` table
+</Step>
+
+</Steps>
+
+**REST API:**
+
+```bash
+curl https://amazon.com/api/v1/popular?category_id=1234
+```
+
+**Response:**
+
+```json
+[
+  {
+    "id": "100",
+    "category_id": "1234",
+    "total_sold": "100000",
+    "product_id": "50"
+  },
+  {
+    "id": "53",
+    "category_id": "1234",
+    "total_sold": "90000",
+    "product_id": "200"
+  },
+  {
+    "id": "75",
+    "category_id": "1234",
+    "total_sold": "80000",
+    "product_id": "3"
+  }
+]
+```
+
+## Step 4: Scale the Design
+
+![Sales Rank Scaled Design](http://i.imgur.com/MzExP06.png)
+
+<Warning>
+**Important:** Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks
+4. Repeat
+</Warning>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="CDN" icon="server">
+Serve static content with low latency
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Horizontal scaling as reverse proxies
+</Card>
+
+<Card title="API Servers" icon="code">
+Separate Read/Write APIs
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Handle 40,000 average reads/second
+- Cache popular product rankings
+- Handle unevenly distributed traffic
+- Handle traffic spikes
+</Card>
+
+<Card title="SQL Database" icon="table">
+Master-Slave replication with read replicas
+</Card>
+
+<Card title="Object Store" icon="folder">
+Store transaction log files (S3)
+- Handles 40 GB/month easily
+</Card>
+
+</CardGroup>
+
+### Database Scaling Challenges
+
+<Warning>
+**Read Challenge:** 40,000 average read requests/second may overwhelm SQL Read Replicas on cache misses.
+
+**Write Challenge:** 400 average writes/second may be tough for single SQL Write Master-Slave.
+</Warning>
+
+**SQL Scaling Patterns:**
+
+- **Federation** - Split databases by function
+- **Sharding** - Distribute data across databases
+- **Denormalization** - Optimize read performance
+- **SQL Tuning** - Optimize queries and indexes
+- **NoSQL** - Move appropriate data to NoSQL
+
+### Storage Optimization
+
+<AccordionGroup>
+
+<Accordion title="Analytics Database">
+**Solution:** Use data warehousing (Amazon Redshift or Google BigQuery)
+
+**Benefit:** Better suited for analytics workloads than transactional databases
+</Accordion>
+
+<Accordion title="Limited Time Period Storage">
+**Strategy:** Store only limited time period in database
+
+**Archive:** Rest in data warehouse or Object Store
+
+**Capacity:** S3 easily handles 40 GB/month constraint
+</Accordion>
+
+</AccordionGroup>
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/sales_rank">
+  View the complete Python implementation including MapReduce ranking logic.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="NoSQL Options" icon="database">
+- Key-value store
+- Document store
+- Wide column store
+- SQL vs NoSQL tradeoffs
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+<Card title="Communication Patterns" icon="network-wired">
+- REST for external APIs
+- RPC for internal services
+- Service discovery
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **MapReduce** processes billions of transactions efficiently
+- **Two-step MapReduce:** aggregate then sort
+- **Object Store** (S3) stores raw transaction logs
+- **Memory Cache** handles read-heavy workload (100:1 ratio)
+- **SQL Database** stores pre-computed rankings
+- **Hourly updates** balance freshness with computational cost
+- **Analytics Database** (Redshift/BigQuery) better for aggregations
+- **Distributed sort** in MapReduce ranks products by category
+- Consider **SQL scaling patterns** for high read/write loads

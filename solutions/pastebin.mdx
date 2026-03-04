@@ -1,0 +1,385 @@
+---
+title: Design Pastebin.com (or Bit.ly)
+description: Learn how to design a URL shortening and paste service like Pastebin.com or Bit.ly that handles millions of requests
+---
+
+## Overview
+
+Design a service like Pastebin.com or Bit.ly that allows users to store and share text content through shortened URLs. This problem explores key concepts including URL generation, storage systems, caching strategies, and scaling to handle millions of users.
+
+<Note>
+**Design Bit.ly** is a similar question, except Pastebin requires storing the paste contents instead of the original unshortened URL.
+</Note>
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** enters a block of text and gets a randomly generated link
+  - Expiration
+    - Default setting does not expire
+    - Can optionally set a timed expiration
+- **User** enters a paste's URL and views the contents
+- **User** is anonymous
+- **Service** tracks analytics of pages
+  - Monthly visit stats
+- **Service** deletes expired pastes
+- **Service** has high availability
+
+#### Out of Scope
+
+- User registration and authentication
+- User editing of documents
+- Custom visibility settings
+- Custom shortlink URLs
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+- Following a short link should be fast
+- Pastes are text only
+- Page view analytics do not need to be realtime
+- 10 million users
+- 10 million paste writes per month
+- 100 million paste reads per month
+- 10:1 read to write ratio
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Size per paste:**
+- 1 KB content per paste
+- `shortlink` - 7 bytes
+- `expiration_length_in_minutes` - 4 bytes
+- `created_at` - 5 bytes
+- `paste_path` - 255 bytes
+- **Total: ~1.27 KB**
+
+**Storage:**
+- 12.7 GB of new paste content per month
+  - 1.27 KB per paste × 10 million pastes per month
+- ~450 GB of new paste content in 3 years
+- 360 million shortlinks in 3 years
+
+**Throughput:**
+- 4 paste writes per second on average
+- 40 read requests per second on average
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Pastebin High Level Design](http://i.imgur.com/BKsBnmG.png)
+
+## Step 3: Core Components
+
+### Use Case: User Creates a Paste
+
+<Steps>
+
+<Step title="Client submits paste">
+  The Client sends a create paste request to the Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Write API">
+  The Web Server forwards the request to the Write API server
+</Step>
+
+<Step title="Generate unique URL">
+  The Write API server:
+  - Generates a unique URL
+  - Checks the SQL Database for duplicates
+  - If not unique, generates another URL
+  - Saves metadata to the SQL Database `pastes` table
+  - Saves paste content to Object Store
+  - Returns the URL to the client
+</Step>
+
+</Steps>
+
+#### Database Schema
+
+The `pastes` table structure:
+
+```sql
+shortlink char(7) NOT NULL
+expiration_length_in_minutes int NOT NULL
+created_at datetime NOT NULL
+paste_path varchar(255) NOT NULL
+PRIMARY KEY(shortlink)
+```
+
+<Note>
+Setting the primary key on `shortlink` creates an index that enforces uniqueness. An additional index on `created_at` speeds up lookups and keeps data in memory.
+</Note>
+
+#### URL Generation Algorithm
+
+To generate unique URLs:
+
+<Steps>
+
+<Step title="Hash the input">
+  Take the MD5 hash of the user's IP address + timestamp
+  - MD5 produces a 128-bit hash value
+  - Uniformly distributed
+  - Could alternatively hash randomly-generated data
+</Step>
+
+<Step title="Encode with Base 62">
+  Base 62 encode the MD5 hash
+  - Encodes to `[a-zA-Z0-9]` which works well for URLs
+  - No need to escape special characters
+  - Deterministic (no randomness)
+</Step>
+
+<Step title="Take first 7 characters">
+  Use the first 7 characters: 62^7 = 3.5 trillion possible values
+  - Sufficient for 360 million shortlinks in 3 years
+</Step>
+
+</Steps>
+
+```python
+def base_encode(num, base=62):
+    digits = []
+    while num > 0:
+        remainder = modulo(num, base)
+        digits.push(remainder)
+        num = divide(num, base)
+    return digits.reverse()
+
+url = base_encode(md5(ip_address+timestamp))[:URL_LENGTH]
+```
+
+#### REST API
+
+**Create paste:**
+
+```bash
+curl -X POST --data '{ "expiration_length_in_minutes": "60", \
+    "paste_contents": "Hello World!" }' https://pastebin.com/api/v1/paste
+```
+
+**Response:**
+
+```json
+{
+    "shortlink": "foobar"
+}
+```
+
+### Use Case: User Views a Paste
+
+<Steps>
+
+<Step title="Client requests paste">
+  The Client sends a get paste request to the Web Server
+</Step>
+
+<Step title="Web Server routes to Read API">
+  The Web Server forwards the request to the Read API server
+</Step>
+
+<Step title="Fetch paste content">
+  The Read API server:
+  - Checks the SQL Database for the URL
+  - If found, fetches paste contents from Object Store
+  - If not found, returns an error message
+</Step>
+
+</Steps>
+
+**REST API:**
+
+```bash
+curl https://pastebin.com/api/v1/paste?shortlink=foobar
+```
+
+**Response:**
+
+```json
+{
+    "paste_contents": "Hello World",
+    "created_at": "YYYY-MM-DD HH:MM:SS",
+    "expiration_length_in_minutes": "60"
+}
+```
+
+### Use Case: Service Tracks Analytics
+
+Since realtime analytics are not required, use MapReduce on Web Server logs:
+
+<Accordion title="MapReduce implementation for hit counts">
+
+```python
+class HitCounts(MRJob):
+
+    def extract_url(self, line):
+        """Extract the generated url from the log line."""
+        ...
+
+    def extract_year_month(self, line):
+        """Return the year and month portions of the timestamp."""
+        ...
+
+    def mapper(self, _, line):
+        """Parse each log line, extract and transform relevant lines.
+
+        Emit key value pairs of the form:
+
+        (2016-01, url0), 1
+        (2016-01, url0), 1
+        (2016-01, url1), 1
+        """
+        url = self.extract_url(line)
+        period = self.extract_year_month(line)
+        yield (period, url), 1
+
+    def reducer(self, key, values):
+        """Sum values for each key.
+
+        (2016-01, url0), 2
+        (2016-01, url1), 1
+        """
+        yield key, sum(values)
+```
+
+</Accordion>
+
+### Use Case: Service Deletes Expired Pastes
+
+To delete expired pastes, scan the SQL Database for entries with expiration timestamps older than the current timestamp. Delete or mark entries as expired.
+
+## Step 4: Scale the Design
+
+![Pastebin Scaled Design](http://i.imgur.com/4edXG0T.png)
+
+<Warning>
+**Important:** Do not jump directly to the final design! Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks while evaluating alternatives and trade-offs
+4. Repeat
+</Warning>
+
+### Scaling Components
+
+<AccordionGroup>
+
+<Accordion title="DNS">
+Use DNS services like Route 53 to route users to the nearest data center.
+</Accordion>
+
+<Accordion title="CDN">
+Serve static content from CDN to reduce latency and server load.
+</Accordion>
+
+<Accordion title="Load Balancer">
+Distribute traffic across multiple web servers for horizontal scaling and high availability.
+</Accordion>
+
+<Accordion title="Web Servers">
+Scale horizontally with multiple web servers acting as reverse proxies.
+</Accordion>
+
+<Accordion title="API Servers">
+Separate Read and Write APIs for independent scaling.
+</Accordion>
+
+<Accordion title="Memory Cache">
+Handle 40 average read requests per second with a Memory Cache (Redis/Memcached) for:
+- Popular content
+- Unevenly distributed traffic
+- Traffic spikes
+</Accordion>
+
+<Accordion title="Object Store">
+Amazon S3 can easily handle 12.7 GB of new content per month.
+</Accordion>
+
+<Accordion title="SQL Database">
+- Use Master-Slave replication
+- SQL Read Replicas handle cache misses
+- 4 average writes per second should be manageable
+- If needed, consider:
+  - Federation
+  - Sharding
+  - Denormalization
+  - SQL Tuning
+</Accordion>
+
+<Accordion title="Analytics Database">
+Use data warehousing solutions like Amazon Redshift or Google BigQuery.
+</Accordion>
+
+</AccordionGroup>
+
+### Additional Scaling Patterns
+
+If the single SQL Write Master-Slave becomes overwhelmed:
+
+- **Federation** - Split databases by function
+- **Sharding** - Split data across multiple databases
+- **Denormalization** - Improve read performance
+- **SQL Tuning** - Optimize queries and indexes
+- **NoSQL** - Consider for specific use cases
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/pastebin">
+  View the complete Python implementation including the REST API and core logic.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="Caching Strategies" icon="database">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Communication Patterns" icon="network-wired">
+- REST APIs for external communication
+- RPC for internal services
+- Service discovery
+</Card>
+
+<Card title="NoSQL Options" icon="table">
+- Key-value store
+- Document store
+- Wide column store
+- SQL vs NoSQL tradeoffs
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- Use **Object Store** (S3) for paste contents instead of database
+- **Base 62 encoding** creates URL-safe shortlinks
+- **Memory Cache** handles read-heavy workload (10:1 ratio)
+- **Master-Slave replication** provides read scalability
+- Iterative scaling approach addresses bottlenecks as they arise
+- Consider **NoSQL** for specific components if needed

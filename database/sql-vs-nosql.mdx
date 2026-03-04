@@ -1,0 +1,286 @@
+---
+title: SQL vs NoSQL
+description: Understand when to use SQL or NoSQL databases based on your application requirements and data characteristics
+---
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/donnemartin/system-design-primer/master/images/wXGqG5f.png" alt="SQL vs NoSQL" />
+  <br />
+  <i>Source: Transitioning from RDBMS to NoSQL</i>
+</p>
+
+Choosing between SQL and NoSQL databases is a critical architectural decision that depends on your application's specific requirements, data structure, and scalability needs.
+
+## When to Use SQL
+
+Reasons for choosing **SQL (Relational Databases)**:
+
+<Accordion title="Structured data with strict schema">
+
+SQL databases excel when your data has a well-defined structure with relationships between entities. The schema enforces data integrity and consistency.
+
+**Examples:**
+- Financial transactions
+- Customer relationship management (CRM)
+- Enterprise resource planning (ERP)
+- Inventory management
+
+</Accordion>
+
+<Accordion title="Complex joins and relationships">
+
+When your application requires complex queries involving multiple tables with foreign keys and relationships, SQL's JOIN operations are highly optimized for this purpose.
+
+**Examples:**
+- Reporting and analytics across related data
+- Multi-table queries with aggregations
+- Data warehouse queries
+
+</Accordion>
+
+<Accordion title="ACID transactions">
+
+Applications requiring strong consistency and transactional guarantees benefit from SQL's ACID properties:
+
+- **Atomicity** - All or nothing transactions
+- **Consistency** - Valid state transitions
+- **Isolation** - Concurrent transaction isolation
+- **Durability** - Committed data persistence
+
+**Examples:**
+- Banking and financial systems
+- E-commerce order processing
+- Booking and reservation systems
+
+</Accordion>
+
+<Accordion title="Mature ecosystem">
+
+SQL databases offer:
+
+- Extensive developer community and resources
+- Well-established tools and libraries
+- Clear patterns for scaling (replication, sharding)
+- Battle-tested in production environments
+- Strong developer talent pool
+
+</Accordion>
+
+### SQL Database Summary
+
+**Choose SQL when you need:**
+
+- ✅ Structured data
+- ✅ Strict schema
+- ✅ Relational data
+- ✅ Need for complex joins
+- ✅ Transactions
+- ✅ Clear patterns for scaling
+- ✅ More established: developers, community, code, tools, etc
+- ✅ Lookups by index are very fast
+
+## When to Use NoSQL
+
+Reasons for choosing **NoSQL (Non-Relational Databases)**:
+
+<Accordion title="Semi-structured or flexible schema">
+
+NoSQL databases are ideal when your data structure:
+
+- Changes frequently
+- Varies between records
+- Needs to evolve without migrations
+- Has nested or hierarchical structure
+
+**Examples:**
+- User-generated content
+- Product catalogs with varying attributes
+- IoT sensor data with different telemetry
+- Rapidly evolving applications
+
+</Accordion>
+
+<Accordion title="Massive scale and throughput">
+
+NoSQL databases are designed for horizontal scalability:
+
+- Store many TB (or PB) of data
+- Very high throughput for IOPS
+- Very data-intensive workload
+- Distributed across multiple data centers
+
+**Examples:**
+- Social media platforms
+- Real-time analytics
+- Content delivery networks
+- Big data applications
+
+</Accordion>
+
+<Accordion title="No complex joins needed">
+
+When your data access patterns don't require complex joins across multiple collections:
+
+- Data is denormalized
+- Each document/record is self-contained
+- Joins happen in application code
+
+**Examples:**
+- User profiles
+- Session data
+- Time-series data
+- Event logs
+
+</Accordion>
+
+<Accordion title="Specific use cases">
+
+**Sample data well-suited for NoSQL:**
+
+- **Rapid ingest** - Clickstream and log data
+- **Leaderboards** - Gaming or scoring data
+- **Temporary data** - Shopping carts, sessions
+- **Hot tables** - Frequently accessed data
+- **Lookup tables** - Metadata and configuration
+
+</Accordion>
+
+### NoSQL Database Summary
+
+**Choose NoSQL when you need:**
+
+- ✅ Semi-structured data
+- ✅ Dynamic or flexible schema
+- ✅ Non-relational data
+- ✅ No need for complex joins
+- ✅ Store many TB (or PB) of data
+- ✅ Very data intensive workload
+- ✅ Very high throughput for IOPS
+
+## Decision Framework
+
+<Accordion title="Start with these questions">
+
+1. **What is your data structure?**
+   - Highly structured → SQL
+   - Flexible/evolving → NoSQL
+
+2. **What are your consistency requirements?**
+   - Strong consistency (ACID) → SQL
+   - Eventual consistency acceptable → NoSQL
+
+3. **What is your expected scale?**
+   - Vertical scaling acceptable → SQL
+   - Horizontal scaling required → NoSQL
+
+4. **What are your query patterns?**
+   - Complex joins and aggregations → SQL
+   - Simple queries, key lookups → NoSQL
+
+5. **What are your performance requirements?**
+   - Transaction throughput → SQL
+   - High read/write throughput → NoSQL
+
+</Accordion>
+
+<Accordion title="Hybrid approaches">
+
+Many modern applications use **both** SQL and NoSQL databases:
+
+- **Polyglot persistence** - Use the right database for each use case
+- **SQL for transactions** - Critical business data with ACID guarantees
+- **NoSQL for scale** - High-volume data like logs, sessions, cache
+
+**Example architecture:**
+```
+├── PostgreSQL → User accounts, orders, payments
+├── Redis → Session cache, real-time data
+├── MongoDB → Product catalog, user preferences
+└── Elasticsearch → Full-text search, logs
+```
+
+</Accordion>
+
+## Real-World Examples
+
+<Accordion title="E-commerce platform">
+
+**SQL databases for:**
+- User accounts and authentication
+- Order management and payments
+- Inventory tracking
+- Financial transactions
+
+**NoSQL databases for:**
+- Product catalog (varying attributes)
+- Shopping cart sessions (Redis)
+- Product recommendations (Graph DB)
+- User activity logs (Document store)
+- Search functionality (Elasticsearch)
+
+</Accordion>
+
+<Accordion title="Social media application">
+
+**SQL databases for:**
+- User authentication
+- Financial/billing data
+- Admin dashboard data
+
+**NoSQL databases for:**
+- User profiles and posts (Document store)
+- Friend relationships (Graph database)
+- Feed/timeline data (Wide column store)
+- Real-time messaging (Key-value store)
+- Media metadata (Document store)
+
+</Accordion>
+
+<Warning>
+
+**Common pitfalls:**
+
+- **Don't default to NoSQL** just because it's trendy - assess your actual needs
+- **Don't ignore consistency requirements** - eventual consistency isn't always acceptable
+- **Don't underestimate SQL scalability** - modern SQL databases can scale significantly
+- **Don't choose based solely on speed** - consider maintenance, debugging, and developer expertise
+
+</Warning>
+
+## Migration Considerations
+
+<Accordion title="Moving from SQL to NoSQL">
+
+**Challenges:**
+- Losing ACID transactions
+- Rewriting join logic in application
+- Managing eventual consistency
+- Denormalizing data structures
+
+**Benefits:**
+- Horizontal scalability
+- Flexible schema evolution
+- Better performance for specific use cases
+
+</Accordion>
+
+<Accordion title="Moving from NoSQL to SQL">
+
+**Challenges:**
+- Defining rigid schema
+- Data migration and transformation
+- Rewriting queries
+
+**Benefits:**
+- Strong consistency guarantees
+- Simplified complex queries
+- Better relational data support
+
+</Accordion>
+
+## Further Reading
+
+- [Scaling up to your first 10 million users](https://www.youtube.com/watch?v=kKjm4ehYiMs)
+- [SQL vs NoSQL differences](https://www.sitepoint.com/sql-vs-nosql-differences/)
+- [CAP Theorem](https://robertgreiner.com/cap-theorem-revisited/)
+- [NoSQL databases survey](https://medium.com/baqend-blog/nosql-databases-a-survey-and-decision-guidance-ea7823a822d)

@@ -1,0 +1,361 @@
+---
+title: Design a Key-Value Store for Search Engine
+description: Learn how to design a key-value cache to store search query results with LRU eviction handling billions of queries
+---
+
+## Overview
+
+Design a key-value cache that saves the results of the most recent web server queries for a search engine. This problem explores cache design, LRU (Least Recently Used) eviction policies, distributed caching, and handling billions of queries per month.
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** sends a search request resulting in a cache hit
+- **User** sends a search request resulting in a cache miss
+- **Service** has high availability
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+  - Popular queries should almost always be in cache
+  - Need to determine how to expire/refresh
+- Serving from cache requires fast lookups
+- Low latency between machines
+- Limited memory in cache
+  - Need to determine what to keep/remove
+  - Need to cache millions of queries
+- 10 million users
+- 10 billion queries per month
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Cache stores:** Ordered list of key: query, value: results
+
+**Size per entry:**
+- `query` - 50 bytes
+- `title` - 20 bytes
+- `snippet` - 200 bytes
+- **Total: 270 bytes**
+
+**Storage:**
+- 2.7 TB of cache data per month if all 10 billion queries are unique
+  - 270 bytes × 10 billion queries per month
+- Limited memory requires expiration strategy
+
+**Throughput:**
+- 4,000 requests per second
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Query Cache High Level Design](http://i.imgur.com/KqZ3dSx.png)
+
+## Step 3: Core Components
+
+### Use Case: User Search Results in Cache Hit
+
+<Steps>
+
+<Step title="Client sends request">
+  Client sends request to Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Query API">
+  Web Server forwards to Query API server
+</Step>
+
+<Step title="Query API processes search">
+  Query API server:
+  - Parses query (remove markup, tokenize, fix typos, normalize, convert to boolean)
+  - Checks Memory Cache for matching content
+  - **If cache hit:**
+    - Updates entry position to front of LRU list
+    - Returns cached contents
+  - **If cache miss:**
+    - Uses Reverse Index Service to find matching documents
+    - Uses Document Service to return titles and snippets
+    - Updates Memory Cache with results at front of LRU list
+</Step>
+
+</Steps>
+
+### Cache Implementation
+
+<Note>
+The cache uses a **doubly-linked list** with a **hash table** for O(1) operations:
+- New items added to head
+- Items to expire removed from tail
+- Hash table provides fast lookups to linked list nodes
+</Note>
+
+<Accordion title="QueryApi class">
+
+```python
+class QueryApi(object):
+
+    def __init__(self, memory_cache, reverse_index_service):
+        self.memory_cache = memory_cache
+        self.reverse_index_service = reverse_index_service
+
+    def parse_query(self, query):
+        """Remove markup, break text into terms, deal with typos,
+        normalize capitalization, convert to use boolean operations.
+        """
+        ...
+
+    def process_query(self, query):
+        query = self.parse_query(query)
+        results = self.memory_cache.get(query)
+        if results is None:
+            results = self.reverse_index_service.process_search(query)
+            self.memory_cache.set(query, results)
+        return results
+```
+
+</Accordion>
+
+<Accordion title="Node class">
+
+```python
+class Node(object):
+
+    def __init__(self, query, results):
+        self.query = query
+        self.results = results
+```
+
+</Accordion>
+
+<Accordion title="LinkedList class">
+
+```python
+class LinkedList(object):
+
+    def __init__(self):
+        self.head = None
+        self.tail = None
+
+    def move_to_front(self, node):
+        ...
+
+    def append_to_front(self, node):
+        ...
+
+    def remove_from_tail(self):
+        ...
+```
+
+</Accordion>
+
+<Accordion title="Cache class (LRU implementation)">
+
+```python
+class Cache(object):
+
+    def __init__(self, MAX_SIZE):
+        self.MAX_SIZE = MAX_SIZE
+        self.size = 0
+        self.lookup = {}  # key: query, value: node
+        self.linked_list = LinkedList()
+
+    def get(self, query):
+        """Get the stored query result from the cache.
+
+        Accessing a node updates its position to the front of the LRU list.
+        """
+        node = self.lookup[query]
+        if node is None:
+            return None
+        self.linked_list.move_to_front(node)
+        return node.results
+
+    def set(self, query, results):
+        """Set the result for the given query key in the cache.
+
+        When updating an entry, updates its position to the front of the LRU list.
+        If the entry is new and the cache is at capacity, removes the oldest entry
+        before the new entry is added.
+        """
+        node = self.lookup[query]
+        if node is not None:
+            # Key exists in cache, update the value
+            node.results = results
+            self.linked_list.move_to_front(node)
+        else:
+            # Key does not exist in cache
+            if self.size == self.MAX_SIZE:
+                # Remove the oldest entry from the linked list and lookup
+                self.lookup.pop(self.linked_list.tail.query, None)
+                self.linked_list.remove_from_tail()
+            else:
+                self.size += 1
+            # Add the new key and value
+            new_node = Node(query, results)
+            self.linked_list.append_to_front(new_node)
+            self.lookup[query] = new_node
+```
+
+</Accordion>
+
+### When to Update the Cache
+
+Update cache when:
+- Page contents change
+- Page is removed or new page added
+- Page rank changes
+
+<Note>
+**TTL (Time To Live):** The most straightforward approach is to set a maximum time that cached entries can stay before requiring update.
+
+**Pattern:** This describes the **cache-aside** pattern.
+</Note>
+
+## Step 4: Scale the Design
+
+![Query Cache Scaled Design](http://i.imgur.com/4j99mhe.png)
+
+<Warning>
+**Important:** Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks
+4. Repeat
+</Warning>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across web servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Horizontal scaling as reverse proxies
+</Card>
+
+<Card title="API Servers" icon="code">
+Application layer for query processing
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Distributed caching with sharding strategies
+</Card>
+
+</CardGroup>
+
+### Expanding Memory Cache to Multiple Machines
+
+To handle heavy load and large memory requirements, scale horizontally with three main options:
+
+<AccordionGroup>
+
+<Accordion title="Option 1: Each machine has its own cache">
+**Pros:**
+- Simple implementation
+
+**Cons:**
+- Low cache hit rate
+- Same query might be cached on multiple machines
+</Accordion>
+
+<Accordion title="Option 2: Each machine has a copy of the cache">
+**Pros:**
+- Simple implementation
+- Higher hit rate than Option 1
+
+**Cons:**
+- Inefficient use of memory
+- Memory constraints limit scalability
+</Accordion>
+
+<Accordion title="Option 3: Shard the cache across machines (RECOMMENDED)">
+**Pros:**
+- Most efficient use of memory
+- Highest cache hit rate
+- Scales well
+
+**Implementation:**
+- Use hashing to determine which machine has cached results
+- `machine = hash(query)`
+- Use **consistent hashing** to minimize disruption when adding/removing machines
+
+**Cons:**
+- More complex implementation
+</Accordion>
+
+</AccordionGroup>
+
+<Note>
+**Consistent Hashing:** Distributes keys across cache servers while minimizing remapping when servers are added or removed.
+</Note>
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/query_cache">
+  View the complete Python implementation including LRU cache logic.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="SQL Scaling Patterns" icon="database">
+- Read replicas
+- Federation
+- Sharding
+- Denormalization
+- SQL Tuning
+</Card>
+
+<Card title="NoSQL Options" icon="table">
+- Key-value store
+- Document store
+- Wide column store
+- Graph database
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **LRU eviction policy** keeps most popular queries cached
+- **Doubly-linked list + hash table** provides O(1) operations
+- **Cache-aside pattern** updates cache on misses
+- **TTL (Time To Live)** handles cache freshness
+- **Consistent hashing** enables distributed caching
+- **Sharding across machines** most efficient for scale
+- Handle **4,000 requests/second** with distributed architecture
+- **Memory Cache** (Redis/Memcached) handles unevenly distributed traffic

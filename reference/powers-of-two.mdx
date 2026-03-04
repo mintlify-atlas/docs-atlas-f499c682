@@ -1,0 +1,32 @@
+---
+title: Powers of Two Table
+description: Quick reference table for powers of two, essential for back-of-the-envelope calculations in system design
+---
+
+You'll sometimes be asked to do 'back-of-the-envelope' estimates in system design interviews. For example, you might need to determine how long it will take to generate 100 image thumbnails from disk or how much memory a data structure will take. The **Powers of two table** is a handy reference for these calculations.
+
+## Powers of Two Reference
+
+| Power | Exact Value | Approx Value | Bytes |
+|-------|-------------|--------------|-------|
+| 7 | 128 | | |
+| 8 | 256 | | |
+| 10 | 1,024 | 1 thousand | 1 KB |
+| 16 | 65,536 | | 64 KB |
+| 20 | 1,048,576 | 1 million | 1 MB |
+| 30 | 1,073,741,824 | 1 billion | 1 GB |
+| 32 | 4,294,967,296 | | 4 GB |
+| 40 | 1,099,511,627,776 | 1 trillion | 1 TB |
+
+## Usage in System Design
+
+This table helps you quickly estimate:
+- Memory requirements for data structures
+- Storage capacity needed for different scales of data
+- Network bandwidth calculations
+- Cache sizing decisions
+
+## Further Reading
+
+- [Powers of two - Wikipedia](https://en.wikipedia.org/wiki/Power_of_two)
+- [Use back of the envelope calculations](http://highscalability.com/blog/2011/1/26/google-pro-tip-use-back-of-the-envelope-calculations-to-choo.html)

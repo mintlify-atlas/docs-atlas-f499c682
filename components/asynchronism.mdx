@@ -1,0 +1,72 @@
+---
+title: Asynchronism
+description: Understanding asynchronous workflows, message queues, task queues, and back pressure
+---
+
+Asynchronous workflows help reduce request times for expensive operations that would otherwise be performed in-line. They can also help by doing time-consuming work in advance, such as periodic aggregation of data.
+
+<img src="https://camo.githubusercontent.com/c01ec137453216bbc188e3a8f16da39ec9131234/687474703a2f2f692e696d6775722e636f6d2f35345359535378e2809c.706e67" alt="Asynchronism" />
+
+## Message Queues
+
+Message queues receive, hold, and deliver messages. If an operation is too slow to perform inline, you can use a message queue with the following workflow:
+
+1. An application publishes a job to the queue, then notifies the user of job status
+2. A worker picks up the job from the queue, processes it, then signals the job is complete
+
+The user is not blocked and the job is processed in the background. During this time, the client might optionally do a small amount of processing to make it seem like the task has completed. For example, if posting a tweet, the tweet could be instantly posted to your timeline, but it could take some time before your tweet is actually delivered to all of your followers.
+
+### Popular Message Queue Solutions
+
+**[Redis](https://redis.io/)** is useful as a simple message broker but messages can be lost.
+
+**[RabbitMQ](https://www.rabbitmq.com/)** is popular but requires you to adapt to the 'AMQP' protocol and manage your own nodes.
+
+**[Amazon SQS](https://aws.amazon.com/sqs/)** is hosted but can have high latency and has the possibility of messages being delivered twice.
+
+## Task Queues
+
+Tasks queues receive tasks and their related data, runs them, then delivers their results. They can support scheduling and can be used to run computationally-intensive jobs in the background.
+
+**[Celery](https://docs.celeryproject.org/en/stable/)** has support for scheduling and primarily has python support.
+
+## Back Pressure
+
+If queues start to grow significantly, the queue size can become larger than memory, resulting in cache misses, disk reads, and even slower performance. [Back pressure](http://mechanical-sympathy.blogspot.com/2012/05/apply-back-pressure-when-overloaded.html) can help by limiting the queue size, thereby maintaining a high throughput rate and good response times for jobs already in the queue.
+
+Once the queue fills up, clients get a server busy or HTTP 503 status code to try again later. Clients can retry the request at a later time, perhaps with [exponential backoff](https://en.wikipedia.org/wiki/Exponential_backoff).
+
+### How Back Pressure Works
+
+1. Monitor queue size
+2. When queue reaches capacity threshold, reject new requests
+3. Return HTTP 503 (Service Unavailable) to clients
+4. Clients retry with exponential backoff
+5. System maintains high throughput for existing jobs
+
+<Note>
+**Message Queues vs Task Queues:** Message queues focus on reliable message delivery between services, while task queues are designed for executing background jobs and computational tasks.
+</Note>
+
+<Accordion title="Disadvantages of Asynchronism">
+
+- Use cases such as inexpensive calculations and realtime workflows might be better suited for synchronous operations, as introducing queues can add delays and complexity.
+
+</Accordion>
+
+## Use Cases for Asynchronous Processing
+
+- Email notifications
+- Image/video processing
+- Data analytics and aggregation
+- Batch processing
+- Long-running computations
+- Third-party API calls
+- Report generation
+
+## Source(s) and Further Reading
+
+- [It's all a numbers game](https://www.youtube.com/watch?v=1KRYH75wgy4)
+- [Applying back pressure when overloaded](http://mechanical-sympathy.blogspot.com/2012/05/apply-back-pressure-when-overloaded.html)
+- [Little's law](https://en.wikipedia.org/wiki/Little%27s_law)
+- [What is the difference between a message queue and a task queue?](https://www.quora.com/What-is-the-difference-between-a-message-queue-and-a-task-queue-Why-would-a-task-queue-require-a-message-broker-like-RabbitMQ-Redis-Celery-or-IronMQ-to-function)

@@ -1,0 +1,155 @@
+---
+title: Security
+description: Security considerations for system design including encryption, input sanitization, and best practices
+---
+
+Security is a broad topic. Unless you have considerable experience, a security background, or are applying for a position that requires knowledge of security, you probably won't need to know more than the basics:
+
+## Core Security Principles
+
+### Encrypt in Transit and at Rest
+
+- **In Transit**: Use TLS/SSL for all network communications
+- **At Rest**: Encrypt sensitive data stored in databases and file systems
+- Use strong encryption algorithms (AES-256, RSA-2048 or higher)
+- Properly manage encryption keys using key management services
+
+### Input Sanitization
+
+Sanitize all user inputs or any input parameters exposed to user to prevent common attacks:
+
+#### Cross-Site Scripting (XSS)
+
+[Cross-site scripting (XSS)](https://en.wikipedia.org/wiki/Cross-site_scripting) attacks inject malicious scripts into web pages viewed by other users.
+
+**Prevention:**
+- Encode output data
+- Validate and sanitize input
+- Use Content Security Policy (CSP) headers
+- Implement proper escaping in templates
+
+#### SQL Injection
+
+[SQL injection](https://en.wikipedia.org/wiki/SQL_injection) attacks insert malicious SQL code into queries.
+
+**Prevention:**
+- Use parameterized queries (prepared statements)
+- Never concatenate user input directly into SQL queries
+- Use ORM frameworks that handle escaping
+- Implement input validation
+
+### Use Parameterized Queries
+
+Always use parameterized queries to prevent SQL injection:
+
+```python
+# Bad - Vulnerable to SQL injection
+query = "SELECT * FROM users WHERE id = " + user_id
+
+# Good - Using parameterized query
+query = "SELECT * FROM users WHERE id = ?"
+db.execute(query, [user_id])
+```
+
+### Principle of Least Privilege
+
+The [principle of least privilege](https://en.wikipedia.org/wiki/Principle_of_least_privilege) means giving users and systems only the minimum levels of access needed to perform their functions.
+
+**Implementation:**
+- Use role-based access control (RBAC)
+- Grant minimal database permissions
+- Use separate service accounts for different components
+- Regularly audit and review permissions
+- Implement just-in-time (JIT) access for sensitive operations
+
+## Additional Security Best Practices
+
+### Authentication and Authorization
+
+- Use multi-factor authentication (MFA) where possible
+- Implement proper session management
+- Use secure password hashing (bcrypt, Argon2)
+- Implement rate limiting to prevent brute force attacks
+- Use OAuth 2.0 or OpenID Connect for third-party authentication
+
+### API Security
+
+- Implement API rate limiting
+- Use API keys or tokens for authentication
+- Validate all API inputs
+- Implement CORS policies properly
+- Use HTTPS for all API endpoints
+- Version your APIs appropriately
+
+### Network Security
+
+- Use firewalls and security groups
+- Implement network segmentation
+- Use VPNs for remote access
+- Enable DDoS protection
+- Monitor network traffic for anomalies
+
+### Application Security
+
+- Keep dependencies up to date
+- Regularly scan for vulnerabilities
+- Implement proper error handling (don't expose stack traces)
+- Use security headers (HSTS, X-Frame-Options, etc.)
+- Implement logging and monitoring
+- Conduct regular security audits and penetration testing
+
+### Data Protection
+
+- Implement data backup and recovery procedures
+- Use data masking for sensitive information
+- Implement secure data deletion
+- Comply with data protection regulations (GDPR, CCPA, etc.)
+- Minimize data collection (privacy by design)
+
+<Note>
+Security should be built into every layer of your system architecture, not added as an afterthought. Implement defense in depth by using multiple security controls.
+</Note>
+
+## Common Security Vulnerabilities (OWASP Top 10)
+
+The [OWASP Top 10](https://www.owasp.org/index.php/OWASP_Top_Ten_Cheat_Sheet) represents the most critical web application security risks:
+
+1. **Broken Access Control**
+2. **Cryptographic Failures**
+3. **Injection**
+4. **Insecure Design**
+5. **Security Misconfiguration**
+6. **Vulnerable and Outdated Components**
+7. **Identification and Authentication Failures**
+8. **Software and Data Integrity Failures**
+9. **Security Logging and Monitoring Failures**
+10. **Server-Side Request Forgery (SSRF)**
+
+<Accordion title="Security Checklist">
+
+- [ ] All data encrypted in transit (TLS/SSL)
+- [ ] Sensitive data encrypted at rest
+- [ ] Input validation on all user inputs
+- [ ] Parameterized queries for all database access
+- [ ] Proper authentication and authorization
+- [ ] Rate limiting implemented
+- [ ] Security headers configured
+- [ ] Dependencies regularly updated
+- [ ] Logging and monitoring in place
+- [ ] Regular security audits conducted
+- [ ] Incident response plan documented
+- [ ] Least privilege principle applied
+- [ ] Secrets management solution implemented
+- [ ] Regular backups configured
+- [ ] Disaster recovery plan documented
+
+</Accordion>
+
+## Source(s) and Further Reading
+
+- [API security checklist](https://github.com/shieldfy/API-Security-Checklist)
+- [Security guide for developers](https://github.com/FallibleInc/security-guide-for-developers)
+- [OWASP top ten](https://www.owasp.org/index.php/OWASP_Top_Ten_Cheat_Sheet)
+- [Wikipedia - Cross-site scripting](https://en.wikipedia.org/wiki/Cross-site_scripting)
+- [Wikipedia - SQL injection](https://en.wikipedia.org/wiki/SQL_injection)
+- [Wikipedia - Principle of least privilege](https://en.wikipedia.org/wiki/Principle_of_least_privilege)

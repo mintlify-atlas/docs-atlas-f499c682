@@ -1,0 +1,311 @@
+---
+title: Design a Parking Lot
+description: Implement a multi-level parking lot system with different vehicle types and spot sizes
+---
+
+## Problem Statement
+
+Design a parking lot system that manages multiple levels, different vehicle types, and various parking spot sizes with intelligent space allocation.
+
+## Constraints and Assumptions
+
+- **Vehicle types**: Motorcycle, Car, Bus
+- **Spot allocation**:
+  - Motorcycle spot → Motorcycle only
+  - Compact spot → Motorcycle, Car
+  - Large spot → Motorcycle, Car
+  - Bus requires 5 consecutive large spots
+- **Multi-level**: Parking lot has multiple levels
+- **Inputs are valid**: No validation needed
+
+## Design Overview
+
+The parking lot system uses a hierarchy of classes to model the physical structure and vehicle types:
+
+1. **VehicleSize**: Enum for vehicle sizes
+2. **Vehicle**: Abstract base class for all vehicles
+3. **Motorcycle, Car, Bus**: Concrete vehicle implementations
+4. **ParkingSpot**: Represents a single parking spot
+5. **Level**: Represents one level of the parking lot
+6. **ParkingLot**: Main orchestrator for the entire system
+
+<Note>
+  This design uses the Composite pattern to build a hierarchy (ParkingLot → Levels → Spots) and the Strategy pattern to allow different vehicles to determine their own parking requirements.
+</Note>
+
+## Implementation
+
+### VehicleSize Enumeration
+
+```python
+from enum import Enum
+
+class VehicleSize(Enum):
+    MOTORCYCLE = 0
+    COMPACT = 1
+    LARGE = 2
+```
+
+### Vehicle Hierarchy
+
+Abstract base class with common vehicle functionality:
+
+```python
+from abc import ABCMeta, abstractmethod
+
+class Vehicle(metaclass=ABCMeta):
+
+    def __init__(self, vehicle_size, license_plate, spot_size):
+        self.vehicle_size = vehicle_size
+        self.license_plate = license_plate
+        self.spot_size = spot_size
+        self.spots_taken = []
+
+    def clear_spots(self):
+        for spot in self.spots_taken:
+            spot.remove_vehicle(self)
+        self.spots_taken = []
+
+    def take_spot(self, spot):
+        self.spots_taken.append(spot)
+
+    @abstractmethod
+    def can_fit_in_spot(self, spot):
+        pass
+```
+
+### Concrete Vehicle Classes
+
+Each vehicle type implements its own parking logic:
+
+```python
+class Motorcycle(Vehicle):
+
+    def __init__(self, license_plate):
+        super(Motorcycle, self).__init__(VehicleSize.MOTORCYCLE, license_plate, spot_size=1)
+
+    def can_fit_in_spot(self, spot):
+        return True  # Can fit in any spot
+
+
+class Car(Vehicle):
+
+    def __init__(self, license_plate):
+        super(Car, self).__init__(VehicleSize.COMPACT, license_plate, spot_size=1)
+
+    def can_fit_in_spot(self, spot):
+        return spot.size == LARGE or spot.size == COMPACT
+
+
+class Bus(Vehicle):
+
+    def __init__(self, license_plate):
+        super(Bus, self).__init__(VehicleSize.LARGE, license_plate, spot_size=5)
+
+    def can_fit_in_spot(self, spot):
+        return spot.size == LARGE
+```
+
+### ParkingLot Class
+
+Top-level orchestrator:
+
+```python
+class ParkingLot(object):
+
+    def __init__(self, num_levels):
+        self.num_levels = num_levels
+        self.levels = []
+
+    def park_vehicle(self, vehicle):
+        for level in self.levels:
+            if level.park_vehicle(vehicle):
+                return True
+        return False
+```
+
+### Level Class
+
+Manages one level of parking:
+
+```python
+class Level(object):
+
+    SPOTS_PER_ROW = 10
+
+    def __init__(self, floor, total_spots):
+        self.floor = floor
+        self.num_spots = total_spots
+        self.available_spots = 0
+        self.parking_spots = []
+
+    def spot_freed(self):
+        self.available_spots += 1
+
+    def park_vehicle(self, vehicle):
+        spot = self._find_available_spot(vehicle)
+        if spot is None:
+            return None
+        else:
+            spot.park_vehicle(vehicle)
+            return spot
+
+    def _find_available_spot(self, vehicle):
+        """Find an available spot where vehicle can fit, or return None"""
+        # Implementation searches for appropriate spot(s)
+        # ...
+
+    def _park_starting_at_spot(self, spot, vehicle):
+        """Occupy starting at spot.spot_number to vehicle.spot_size."""
+        # Implementation for multi-spot parking (buses)
+        # ...
+```
+
+### ParkingSpot Class
+
+Represents individual parking spots:
+
+```python
+class ParkingSpot(object):
+
+    def __init__(self, level, row, spot_number, spot_size, vehicle_size):
+        self.level = level
+        self.row = row
+        self.spot_number = spot_number
+        self.spot_size = spot_size
+        self.vehicle_size = vehicle_size
+        self.vehicle = None
+
+    def is_available(self):
+        return self.vehicle is None
+
+    def can_fit_vehicle(self, vehicle):
+        if self.vehicle is not None:
+            return False
+        return vehicle.can_fit_in_spot(self)
+
+    def park_vehicle(self, vehicle):  # ...
+    def remove_vehicle(self):  # ...
+```
+
+## Key Design Patterns
+
+### Composite Pattern
+
+Hierarchical structure for the parking system:
+
+```
+┌──────────────┐
+│ ParkingLot   │
+└──────────────┘
+       │
+       │ contains
+       ↓
+┌──────────────┐
+│   Level 1    │
+│   Level 2    │
+│   Level N    │
+└──────────────┘
+       │
+       │ contains
+       ↓
+┌──────────────┐
+│ ParkingSpot  │
+│ ParkingSpot  │
+│ ParkingSpot  │
+└──────────────┘
+```
+
+### Strategy Pattern
+
+Each vehicle determines its own parking requirements:
+
+- **Motorcycle**: Can fit anywhere (`can_fit_in_spot()` always returns True)
+- **Car**: Requires compact or large spots
+- **Bus**: Requires 5 consecutive large spots
+
+### Polymorphism
+
+The abstract `Vehicle` class allows treating all vehicle types uniformly while maintaining specific behavior:
+
+```python
+def park_vehicle(self, vehicle):  # Works for any vehicle type
+    spot = self._find_available_spot(vehicle)
+    if spot:
+        spot.park_vehicle(vehicle)
+```
+
+## Parking Logic
+
+### Spot Allocation Strategy
+
+1. **Iterate through levels** from bottom to top
+2. **For each level**, search for appropriate spots
+3. **Check compatibility** using `vehicle.can_fit_in_spot(spot)`
+4. **For buses**, ensure 5 consecutive large spots available
+5. **Allocate and mark** spots as taken
+
+### Multi-Spot Parking (Buses)
+
+Buses require special handling:
+
+```python
+# Pseudo-code for bus parking
+if vehicle.spot_size == 5:
+    # Find 5 consecutive large spots
+    consecutive_count = 0
+    for spot in spots:
+        if spot.is_available() and spot.size == LARGE:
+            consecutive_count += 1
+            if consecutive_count == 5:
+                # Park bus across all 5 spots
+                for i in range(5):
+                    spots[i].park_vehicle(vehicle)
+                    vehicle.take_spot(spots[i])
+                return True
+        else:
+            consecutive_count = 0
+```
+
+## Complexity Analysis
+
+| Operation | Time Complexity | Notes |
+|-----------|-----------------|-------|
+| park_vehicle() | O(n × m) | n levels, m spots per level |
+| find_available_spot() | O(m) | m spots on a level |
+| can_fit_in_spot() | O(1) | Simple boolean check |
+| clear_spots() | O(k) | k spots taken by vehicle |
+
+<Note>
+  For buses, finding 5 consecutive spots requires scanning the level, which is O(m) where m is the number of spots. The worst case is when we scan all levels and all spots, resulting in O(n × m) time complexity.
+</Note>
+
+## Design Considerations
+
+### Advantages
+
+- **Flexible**: Easy to add new vehicle types or spot sizes
+- **Encapsulation**: Each class manages its own state and behavior
+- **Scalable**: Can add unlimited levels and spots
+- **Type-safe**: Abstract methods enforce implementation of required behavior
+
+### Spot Size Flexibility
+
+| Vehicle | Motorcycle Spot | Compact Spot | Large Spot |
+|---------|----------------|--------------|------------|
+| Motorcycle | ✓ | ✓ | ✓ |
+| Car | ✗ | ✓ | ✓ |
+| Bus | ✗ | ✗ | ✓ (5 consecutive) |
+
+### Potential Improvements
+
+1. **Spot optimization**: Algorithm to minimize wasted space (e.g., prefer compact spots for motorcycles)
+2. **Reservation system**: Allow advance booking of spots
+3. **Pricing tiers**: Different rates for different spot sizes or locations
+4. **Time tracking**: Calculate parking duration and fees
+5. **Availability display**: Show available spots per level
+6. **Handicap spots**: Special spots with accessibility requirements
+7. **Electric vehicle charging**: Designate spots with charging stations
+8. **Valet mode**: Automatic optimal parking selection
+9. **Payment integration**: Link to payment processing system
+10. **Statistics**: Track utilization, revenue, peak hours

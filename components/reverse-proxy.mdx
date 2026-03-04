@@ -1,0 +1,60 @@
+---
+title: Reverse Proxy (Web Server)
+description: Understanding reverse proxies, their benefits, and comparison with load balancers
+---
+
+A reverse proxy is a web server that centralizes internal services and provides unified interfaces to the public. Requests from clients are forwarded to a server that can fulfill it before the reverse proxy returns the server's response to the client.
+
+<img src="https://camo.githubusercontent.com/e88216b6d04c163f5e6e32f9e2e4d7fb84a2c4b0/687474703a2f2f692e696d6775722e636f6d2f6e3431417a66662e706e67" alt="Reverse Proxy" />
+
+## Benefits
+
+Additional benefits include:
+
+- **Increased security** - Hide information about backend servers, blacklist IPs, limit number of connections per client
+- **Increased scalability and flexibility** - Clients only see the reverse proxy's IP, allowing you to scale servers or change their configuration
+- **SSL termination** - Decrypt incoming requests and encrypt server responses so backend servers do not have to perform these potentially expensive operations
+  - Removes the need to install [X.509 certificates](https://en.wikipedia.org/wiki/X.509) on each server
+- **Compression** - Compress server responses
+- **Caching** - Return the response for cached requests
+- **Static content** - Serve static content directly
+  - HTML/CSS/JS
+  - Photos
+  - Videos
+  - Etc
+
+## Load Balancer vs Reverse Proxy
+
+### When to Use Each
+
+- **Load Balancer**: Deploying a load balancer is useful when you have multiple servers. Often, load balancers route traffic to a set of servers serving the same function.
+
+- **Reverse Proxy**: Reverse proxies can be useful even with just one web server or application server, opening up the benefits described in the previous section.
+
+- **Both**: Solutions such as NGINX and HAProxy can support both layer 7 reverse proxying and load balancing.
+
+<Note>
+A reverse proxy can be beneficial even with a single backend server, while load balancers are specifically designed for distributing traffic across multiple servers.
+</Note>
+
+### Key Differences
+
+| Aspect | Load Balancer | Reverse Proxy |
+|--------|--------------|---------------|
+| **Primary Purpose** | Distribute traffic across multiple servers | Centralize and manage access to backend services |
+| **Minimum Servers** | Multiple servers | Can work with single server |
+| **Use Case** | High availability and horizontal scaling | Security, caching, SSL termination, serving static content |
+
+<Accordion title="Disadvantages of Reverse Proxy">
+
+- Introducing a reverse proxy results in increased complexity.
+- A single reverse proxy is a single point of failure, configuring multiple reverse proxies (ie a [failover](https://en.wikipedia.org/wiki/Failover)) further increases complexity.
+
+</Accordion>
+
+## Source(s) and Further Reading
+
+- [Reverse proxy vs load balancer](https://www.nginx.com/resources/glossary/reverse-proxy-vs-load-balancer/)
+- [NGINX architecture](https://www.nginx.com/blog/inside-nginx-how-we-designed-for-performance-scale/)
+- [HAProxy architecture guide](http://www.haproxy.org/download/1.2/doc/architecture.txt)
+- [Wikipedia - Reverse proxy](https://en.wikipedia.org/wiki/Reverse_proxy)

@@ -1,0 +1,56 @@
+---
+title: Performance vs scalability
+description: Understanding the difference between performance and scalability problems in distributed systems
+---
+
+A service is **scalable** if it results in increased **performance** in a manner proportional to resources added. Generally, increasing performance means serving more units of work, but it can also be to handle larger units of work, such as when datasets grow.
+
+## Understanding the difference
+
+Another way to look at performance vs scalability:
+
+- If you have a **performance** problem, your system is slow for a single user.
+- If you have a **scalability** problem, your system is fast for a single user but slow under heavy load.
+
+<Note>
+A system that performs well for a single user but degrades under load has a scalability problem, not a performance problem.
+</Note>
+
+## Key concepts
+
+### Performance
+
+Performance refers to how quickly your system responds to requests. A performance problem means that even with minimal load (e.g., a single user), the system is slow.
+
+Performance issues are typically addressed by:
+- Optimizing algorithms
+- Reducing computational complexity
+- Improving database queries
+- Minimizing network latency
+
+### Scalability
+
+Scalability refers to your system's ability to handle increased load by adding resources. A scalability problem means the system works well under light load but struggles as load increases.
+
+Scalability issues are typically addressed by:
+- Horizontal scaling (adding more servers)
+- Load balancing
+- Caching strategies
+- Database sharding
+- Asynchronous processing
+
+## Why it matters
+
+Understanding whether you have a performance or scalability problem is critical because the solutions are different:
+
+- **Performance problems** require optimization of existing code and infrastructure
+- **Scalability problems** require architectural changes to distribute load
+
+<Info>
+It's possible to have both performance and scalability problems simultaneously. Address performance issues first, as they may be masking scalability problems.
+</Info>
+
+## Additional resources
+
+- [A word on scalability](http://www.allthingsdistributed.com/2006/03/a_word_on_scalability.html)
+- [Scalability, availability, stability, patterns](http://www.slideshare.net/jboner/scalability-availability-stability-patterns/)

@@ -1,97 +1,253 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: System Design Primer
+description: Learn how to design large-scale systems and ace your system design interviews
+mode: custom
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#7cbce4] via-[#5eaad9] to-[#4a9bc9] dark:from-[#1a1d27] dark:via-[#242838] dark:to-[#1a1d27] py-20">
+  <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI2MCIgaGVpZ2h0PSI2MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAxMCAwIEwgMCAwIDAgMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS1vcGFjaXR5PSIwLjEiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-20"></div>
+  <div className="relative max-w-6xl mx-auto px-6 text-center">
+    <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white dark:text-gray-100 mb-6">
+      System Design Primer
+    </h1>
+    <p className="text-xl sm:text-2xl text-white/90 dark:text-gray-300 max-w-3xl mx-auto mb-10">
+      Master large-scale system design principles and ace your technical interviews with comprehensive guides, real-world solutions, and hands-on examples.
+    </p>
+    <div className="flex flex-wrap justify-center gap-4">
+      <a 
+        href="/introduction" 
+        className="inline-flex items-center px-8 py-3.5 bg-white dark:bg-[#242838] text-[#7cbce4] dark:text-white font-semibold rounded-full hover:bg-gray-50 dark:hover:bg-[#2d3244] transition-colors no-underline shadow-lg"
+      >
+        Get Started
+        <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </a>
+      <a 
+        href="/interview/approach" 
+        className="inline-flex items-center px-8 py-3.5 bg-white/10 dark:bg-white/5 text-white dark:text-gray-100 font-semibold rounded-full border border-white/30 dark:border-gray-600 hover:bg-white/20 dark:hover:bg-white/10 transition-colors no-underline backdrop-blur-sm"
+      >
+        Interview Guide
+      </a>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Quick start</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Get up to speed with system design fundamentals in minutes</p>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Understand the fundamentals">
+      Start with core concepts like performance vs scalability, latency vs throughput, and the CAP theorem. These trade-offs are fundamental to every system design decision.
+      
+      <CardGroup cols={2}>
+        <Card title="Performance vs Scalability" icon="gauge-high" href="/topics/performance-vs-scalability">
+          Learn when to optimize for speed versus scale
+        </Card>
+        <Card title="Availability vs Consistency" icon="scale-balanced" href="/topics/availability-vs-consistency">
+          Understand the CAP theorem and its implications
+        </Card>
+      </CardGroup>
+    </Step>
 
-## Make it yours
+    <Step title="Learn core components">
+      Master the building blocks of distributed systems: load balancers, caches, databases, CDNs, and message queues.
+      
+      <Note>
+        Every large-scale system is built from these fundamental components. Understanding how they work individually and together is crucial.
+      </Note>
+    </Step>
 
-Design a docs site that looks great and empowers your users.
+    <Step title="Practice with real problems">
+      Work through actual system design interview questions with detailed solutions, diagrams, and code examples.
+      
+      ```text Example Problems
+      • Design Pastebin/Bit.ly - URL shortening service
+      • Design Twitter - Timeline and search functionality  
+      • Design a Web Crawler - Distributed web indexing
+      • Design Mint.com - Personal finance aggregator
+      ```
+    </Step>
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+    <Step title="Use Anki flashcards for retention">
+      Download our spaced repetition flashcard decks to reinforce your learning and retain key concepts for interviews.
+      
+      <a href="/anki-flashcards" className="inline-flex items-center text-[#7cbce4] dark:text-[#b2d6ef] hover:underline font-medium">
+        Get the flashcard decks
+        <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </a>
+    </Step>
+  </Steps>
+</div>
 
-## Create beautiful pages
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Explore by topic</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Deep dive into specific areas of system design</p>
 
-Everything you need to create world-class documentation.
+  <CardGroup cols={3}>
+    <Card title="DNS" icon="globe" href="/components/dns">
+      Domain name system and hierarchical resolution
+    </Card>
+    <Card title="CDN" icon="network-wired" href="/components/cdn">
+      Content delivery networks and edge caching
+    </Card>
+    <Card title="Load Balancer" icon="scale-balanced" href="/components/load-balancer">
+      Distribute traffic across multiple servers
+    </Card>
+    <Card title="Reverse Proxy" icon="arrow-right-arrow-left" href="/components/reverse-proxy">
+      Centralize services and add security
+    </Card>
+    <Card title="Database" icon="database" href="/components/database">
+      RDBMS, NoSQL, replication, and sharding
+    </Card>
+    <Card title="Cache" icon="bolt" href="/components/cache">
+      In-memory data stores and caching strategies
+    </Card>
+    <Card title="Asynchronism" icon="clock" href="/components/asynchronism">
+      Message queues and task queues
+    </Card>
+    <Card title="Communication" icon="comments" href="/components/communication">
+      TCP, UDP, RPC, and REST protocols
+    </Card>
+    <Card title="Security" icon="shield-halved" href="/components/security">
+      Encryption, authentication, and authorization
+    </Card>
+  </CardGroup>
+</div>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Interview preparation</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Real system design interview problems with complete solutions</p>
 
-## Need inspiration?
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <a href="/solutions/pastebin" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7cbce4] dark:hover:border-[#7cbce4] overflow-hidden no-underline transition-colors bg-white dark:bg-[#1a1d27]">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <div className="p-2 bg-[#7cbce4]/10 dark:bg-[#7cbce4]/20 rounded-lg">
+            <svg className="w-6 h-6 text-[#7cbce4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#7cbce4] dark:group-hover:text-[#b2d6ef] transition-colors">Design Pastebin</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Design a URL shortening service like Bit.ly with hash generation, storage, and redirection at scale.</p>
+        <div className="flex items-center text-[#7cbce4] dark:text-[#b2d6ef] text-sm font-medium">
+          View solution
+          <svg className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+    <a href="/solutions/twitter" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7cbce4] dark:hover:border-[#7cbce4] overflow-hidden no-underline transition-colors bg-white dark:bg-[#1a1d27]">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <div className="p-2 bg-[#7cbce4]/10 dark:bg-[#7cbce4]/20 rounded-lg">
+            <svg className="w-6 h-6 text-[#7cbce4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#7cbce4] dark:group-hover:text-[#b2d6ef] transition-colors">Design Twitter</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Build a social media timeline and search system with fan-out strategies and real-time updates.</p>
+        <div className="flex items-center text-[#7cbce4] dark:text-[#b2d6ef] text-sm font-medium">
+          View solution
+          <svg className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/solutions/web-crawler" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7cbce4] dark:hover:border-[#7cbce4] overflow-hidden no-underline transition-colors bg-white dark:bg-[#1a1d27]">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <div className="p-2 bg-[#7cbce4]/10 dark:bg-[#7cbce4]/20 rounded-lg">
+            <svg className="w-6 h-6 text-[#7cbce4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#7cbce4] dark:group-hover:text-[#b2d6ef] transition-colors">Design a Web Crawler</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Create a distributed web crawler that indexes billions of pages efficiently with politeness policies.</p>
+        <div className="flex items-center text-[#7cbce4] dark:text-[#b2d6ef] text-sm font-medium">
+          View solution
+          <svg className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+
+    <a href="/solutions/scaling-aws" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7cbce4] dark:hover:border-[#7cbce4] overflow-hidden no-underline transition-colors bg-white dark:bg-[#1a1d27]">
+      <div className="p-6">
+        <div className="flex items-start justify-between mb-3">
+          <div className="p-2 bg-[#7cbce4]/10 dark:bg-[#7cbce4]/20 rounded-lg">
+            <svg className="w-6 h-6 text-[#7cbce4]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 group-hover:text-[#7cbce4] dark:group-hover:text-[#b2d6ef] transition-colors">Scale to Millions on AWS</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Learn how to scale a system from one user to millions using AWS services and best practices.</p>
+        <div className="flex items-center text-[#7cbce4] dark:text-[#b2d6ef] text-sm font-medium">
+          View solution
+          <svg className="ml-1 w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <div className="mt-8 text-center">
+    <a href="/solutions/pastebin" className="inline-flex items-center text-[#7cbce4] dark:text-[#b2d6ef] hover:underline font-medium">
+      View all 8 system design problems
+      <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Additional resources</h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">Reference materials and real-world examples</p>
+
+  <CardGroup cols={2}>
+    <Card title="Powers of Two Table" icon="calculator" href="/reference/powers-of-two">
+      Essential memory and storage calculations
+    </Card>
+    <Card title="Latency Numbers" icon="stopwatch" href="/reference/latency-numbers">
+      Performance benchmarks every programmer should know
+    </Card>
+    <Card title="Real-World Architectures" icon="building" href="/reference/real-world-architectures">
+      Case studies from production systems
+    </Card>
+    <Card title="Company Engineering Blogs" icon="newspaper" href="/reference/company-blogs">
+      Learn from tech companies' engineering blogs
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-20 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-3xl bg-gradient-to-r from-[#7cbce4] to-[#5eaad9] dark:from-[#242838] dark:to-[#1a1d27] p-12 text-center border dark:border-[#27272a]">
+    <h2 className="text-3xl font-bold text-white dark:text-gray-100 mb-4">Ready to master system design?</h2>
+    <p className="text-lg text-white/90 dark:text-gray-300 mb-8 max-w-2xl mx-auto">
+      Start learning today with our comprehensive guides, real interview problems, and hands-on examples.
+    </p>
+    <a 
+      href="/introduction" 
+      className="inline-flex items-center px-8 py-3.5 bg-white dark:bg-[#7cbce4] text-[#7cbce4] dark:text-white font-semibold rounded-full hover:bg-gray-50 dark:hover:bg-[#6bb4dc] transition-colors no-underline shadow-lg"
+    >
+      Start Learning
+      <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+      </svg>
+    </a>
+  </div>
+</div>

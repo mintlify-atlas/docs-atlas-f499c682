@@ -1,122 +1,129 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "System Design Primer",
+  "theme": "maple",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#7cbce4",
+    "light": "#b2d6ef",
+    "dark": "#7cbce4"
   },
-  "favicon": "/favicon.svg",
+  "metadata": {
+    "favicon": "https://media.brand.dev/44b6e329-ac6e-4901-96af-3c6f238f7641.svg"
+  },
+  "logo": {
+    "light": "https://media.brand.dev/bb034e5f-dc11-4483-9b72-64e1e6690979.png",
+    "dark": "https://media.brand.dev/44b6e329-ac6e-4901-96af-3c6f238f7641.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/donnemartin/system-design-primer"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/donnemartin/system-design-primer"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Learn",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "introduction",
+              "study-guide",
+              "anki-flashcards"
             ]
           },
           {
-            "group": "Customization",
+            "group": "System Design Topics",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "topics/getting-started",
+              "topics/performance-vs-scalability",
+              "topics/latency-vs-throughput",
+              "topics/availability-vs-consistency",
+              "topics/consistency-patterns",
+              "topics/availability-patterns"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Core Components",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "components/dns",
+              "components/cdn",
+              "components/load-balancer",
+              "components/reverse-proxy",
+              "components/application-layer",
+              "components/database",
+              "components/cache",
+              "components/asynchronism",
+              "components/communication",
+              "components/security"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Database",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "database/rdbms",
+              "database/nosql",
+              "database/sql-vs-nosql"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Interview Prep",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Interview Guide",
             "pages": [
-              "api-reference/introduction"
+              "interview/approach",
+              "interview/calculations"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "System Design Problems",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "solutions/pastebin",
+              "solutions/twitter",
+              "solutions/web-crawler",
+              "solutions/mint",
+              "solutions/social-network",
+              "solutions/key-value-store",
+              "solutions/sales-rank",
+              "solutions/scaling-aws"
+            ]
+          },
+          {
+            "group": "Object-Oriented Design",
+            "pages": [
+              "ood/hash-map",
+              "ood/lru-cache",
+              "ood/call-center",
+              "ood/deck-of-cards",
+              "ood/parking-lot",
+              "ood/chat-server"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "reference/powers-of-two",
+              "reference/latency-numbers",
+              "reference/real-world-architectures",
+              "reference/company-blogs"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

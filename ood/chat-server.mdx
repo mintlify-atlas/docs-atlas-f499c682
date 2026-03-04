@@ -1,0 +1,329 @@
+---
+title: Design a Chat Server
+description: Implement an online chat system with user management, friend requests, and group/private messaging
+---
+
+## Problem Statement
+
+Design an online chat system that supports user management, friend connections, private messaging, and group chat functionality.
+
+## Constraints and Assumptions
+
+- **Text conversations only** (no media)
+- **User operations**:
+  - Add, remove, update users
+  - Manage friend lists
+  - Send, approve, reject friend requests
+- **Chat types**:
+  - Private 1-1 chat
+  - Group chat with multiple participants
+- **No scaling concerns initially** (single server)
+
+## Design Overview
+
+The chat system uses several interconnected classes:
+
+1. **UserService**: Manages all users and friend requests
+2. **User**: Represents a chat user with friends and conversations
+3. **Chat**: Abstract base class for all chat types
+4. **PrivateChat**: One-on-one conversation
+5. **GroupChat**: Multi-user conversation
+6. **Message**: Individual message in a chat
+7. **AddRequest**: Friend request with status tracking
+8. **RequestStatus**: Enum for friend request states
+
+<Note>
+  This design uses the Mediator pattern where UserService acts as a central coordinator for user interactions, and the Composite pattern where different chat types share a common interface.
+</Note>
+
+## Implementation
+
+### UserService Class
+
+Central service for managing users and relationships:
+
+```python
+class UserService(object):
+
+    def __init__(self):
+        self.users_by_id = {}  # key: user id, value: User
+
+    def add_user(self, user_id, name, pass_hash):  # ...
+    def remove_user(self, user_id):  # ...
+    def add_friend_request(self, from_user_id, to_user_id):  # ...
+    def approve_friend_request(self, from_user_id, to_user_id):  # ...
+    def reject_friend_request(self, from_user_id, to_user_id):  # ...
+```
+
+### User Class
+
+Represents a user with all their social connections:
+
+```python
+class User(object):
+
+    def __init__(self, user_id, name, pass_hash):
+        self.user_id = user_id
+        self.name = name
+        self.pass_hash = pass_hash
+        self.friends_by_id = {}  # key: friend id, value: User
+        self.friend_ids_to_private_chats = {}  # key: friend id, value: private chats
+        self.group_chats_by_id = {}  # key: chat id, value: GroupChat
+        self.received_friend_requests_by_friend_id = {}  # key: friend id, value: AddRequest
+        self.sent_friend_requests_by_friend_id = {}  # key: friend id, value: AddRequest
+
+    def message_user(self, friend_id, message):  # ...
+    def message_group(self, group_id, message):  # ...
+    def send_friend_request(self, friend_id):  # ...
+    def receive_friend_request(self, friend_id):  # ...
+    def approve_friend_request(self, friend_id):  # ...
+    def reject_friend_request(self, friend_id):  # ...
+```
+
+### Chat Hierarchy
+
+Abstract base class and concrete implementations:
+
+```python
+from abc import ABCMeta
+
+class Chat(metaclass=ABCMeta):
+
+    def __init__(self, chat_id):
+        self.chat_id = chat_id
+        self.users = []
+        self.messages = []
+
+
+class PrivateChat(Chat):
+
+    def __init__(self, first_user, second_user):
+        super(PrivateChat, self).__init__()
+        self.users.append(first_user)
+        self.users.append(second_user)
+
+
+class GroupChat(Chat):
+
+    def add_user(self, user):  # ...
+    def remove_user(self, user):  # ...
+```
+
+### Message Class
+
+Represents individual messages:
+
+```python
+class Message(object):
+
+    def __init__(self, message_id, message, timestamp):
+        self.message_id = message_id
+        self.message = message
+        self.timestamp = timestamp
+```
+
+### Friend Request Classes
+
+Manage friend connection requests:
+
+```python
+from enum import Enum
+
+class AddRequest(object):
+
+    def __init__(self, from_user_id, to_user_id, request_status, timestamp):
+        self.from_user_id = from_user_id
+        self.to_user_id = to_user_id
+        self.request_status = request_status
+        self.timestamp = timestamp
+
+
+class RequestStatus(Enum):
+    UNREAD = 0
+    READ = 1
+    ACCEPTED = 2
+    REJECTED = 3
+```
+
+## Key Design Patterns
+
+### Mediator Pattern
+
+`UserService` acts as a mediator coordinating interactions between users:
+
+```
+┌──────────────┐
+│ UserService  │  (Mediator)
+│              │
+│ Coordinates: │
+│ - User CRUD  │
+│ - Friend req │
+└──────────────┘
+       ↓
+┌──────────────┐
+│   User A     │ ←→ Friend Request ←→ User B
+│   User C     │
+└──────────────┘
+```
+
+### Composite Pattern
+
+Different chat types share a common interface:
+
+```
+┌──────────────┐
+│     Chat     │  (Abstract)
+│  - users     │
+│  - messages  │
+└──────────────┘
+       ↑
+       │ extends
+   ┌───┴───┐
+   │       │
+┌──────┐ ┌────────┐
+│Private│ │Group   │
+│Chat   │ │Chat    │
+└──────┘ └────────┘
+```
+
+### Observer Pattern (Implicit)
+
+Users maintain references to their chats and can be notified of new messages:
+
+- `friend_ids_to_private_chats`: Maps friends to conversations
+- `group_chats_by_id`: Tracks group memberships
+
+## System Workflows
+
+### Friend Request Flow
+
+```
+User A                    UserService                    User B
+  │                            │                            │
+  │ send_friend_request()      │                            │
+  ├───────────────────────────>│                            │
+  │                            │ create AddRequest          │
+  │                            │ (status: UNREAD)           │
+  │                            ├───────────────────────────>│
+  │                            │                            │
+  │                            │ approve_friend_request()   │
+  │                            │<───────────────────────────┤
+  │                            │                            │
+  │                            │ update AddRequest          │
+  │                            │ (status: ACCEPTED)         │
+  │                            │                            │
+  │<───────────────────────────┤ add to friends_by_id       │
+  │  add to friends_by_id      │───────────────────────────>│
+```
+
+### Private Chat Flow
+
+```
+User A                                              User B
+  │                                                    │
+  │ Check if private chat exists                      │
+  │ with User B in                                    │
+  │ friend_ids_to_private_chats                       │
+  │                                                    │
+  │ If not, create PrivateChat                        │
+  │ Add to both users' mappings                       │
+  │                                                    │
+  │ message_user(friend_id, message)                  │
+  ├──────────────────────────────────────────────────>│
+  │                                                    │
+  │ Create Message object                             │
+  │ Add to PrivateChat.messages[]                     │
+```
+
+### Group Chat Flow
+
+```
+User A creates GroupChat
+  │
+  ├─> Add User A to GroupChat.users[]
+  │
+  ├─> User A invites User B
+  │   └─> Add User B to GroupChat.users[]
+  │   └─> Add GroupChat to User B's group_chats_by_id
+  │
+  ├─> User A invites User C
+  │   └─> Add User C to GroupChat.users[]
+  │   └─> Add GroupChat to User C's group_chats_by_id
+  │
+  └─> Any user can message_group(group_id, message)
+      └─> Message added to GroupChat.messages[]
+```
+
+## Data Structure Design
+
+### User Relationships
+
+The `User` class uses multiple dictionaries to efficiently manage relationships:
+
+```python
+# Fast O(1) friend lookup
+friends_by_id = {
+    user_id_1: User(...),
+    user_id_2: User(...)
+}
+
+# Map friend to their private chat
+friend_ids_to_private_chats = {
+    user_id_1: PrivateChat(...),
+    user_id_2: PrivateChat(...)
+}
+
+# Track all group conversations
+group_chats_by_id = {
+    chat_id_1: GroupChat(...),
+    chat_id_2: GroupChat(...)
+}
+```
+
+## Complexity Analysis
+
+| Operation | Time Complexity | Notes |
+|-----------|-----------------|-------|
+| add_user() | O(1) | Hash map insertion |
+| remove_user() | O(n) | Remove from all friends' lists |
+| send_friend_request() | O(1) | Create and store request |
+| approve_friend_request() | O(1) | Update status, add to friends |
+| message_user() | O(1) | Append to chat messages |
+| message_group() | O(1) | Append to chat messages |
+
+<Note>
+  Most operations are O(1) due to hash map lookups. The exception is remove_user(), which requires iterating through friends to remove bidirectional references.
+</Note>
+
+## Design Considerations
+
+### Advantages
+
+- **Clear separation**: Users, chats, and messages are distinct entities
+- **Bidirectional relationships**: Both users maintain friend and chat references
+- **Flexible chat types**: Easy to add new chat types (e.g., channels, threads)
+- **Request lifecycle**: Clear states for friend requests
+
+### Friend Request States
+
+```
+UNREAD → READ → ACCEPTED
+              → REJECTED
+```
+
+### Potential Improvements
+
+1. **Message delivery**: Add read receipts, delivery status, typing indicators
+2. **Online status**: Track user presence (online, away, offline)
+3. **Message history**: Implement pagination for loading older messages
+4. **Search**: Full-text search across messages and users
+5. **Notifications**: Push notifications for new messages and friend requests
+6. **Encryption**: End-to-end encryption for private messages
+7. **Media support**: Images, videos, files, voice messages
+8. **Message reactions**: Emojis, likes, replies
+9. **User blocking**: Prevent unwanted interactions
+10. **Admin controls**: Moderation tools for group chats
+11. **Scalability**: Distribute users across servers, use message queues
+12. **Persistence**: Database backend for storing users and messages
+13. **WebSocket support**: Real-time message delivery
+14. **Rate limiting**: Prevent spam and abuse

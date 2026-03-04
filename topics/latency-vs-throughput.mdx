@@ -1,0 +1,87 @@
+---
+title: Latency vs throughput
+description: Understanding the difference between latency and throughput in system design
+---
+
+**Latency** is the time to perform some action or to produce some result.
+
+**Throughput** is the number of such actions or results per unit of time.
+
+## Understanding the concepts
+
+### Latency
+
+Latency measures the time it takes for a single operation to complete. It's typically measured in milliseconds (ms) or microseconds (μs).
+
+Examples of latency:
+- Time to retrieve a record from a database
+- Time for a web page to load
+- Time for an API request to complete
+- Network round-trip time
+
+### Throughput
+
+Throughput measures the number of operations completed per unit of time. It's typically measured in requests per second (RPS), transactions per second (TPS), or bytes per second.
+
+Examples of throughput:
+- Number of API requests handled per second
+- Number of database queries processed per second
+- Number of messages processed from a queue per second
+- Amount of data transferred per second
+
+## The relationship
+
+Latency and throughput are related but distinct concepts:
+
+- **Low latency** doesn't necessarily mean **high throughput**
+- **High throughput** doesn't necessarily mean **low latency**
+
+For example:
+- A system might process requests very quickly (low latency) but only handle a few at a time (low throughput)
+- A system might process many requests simultaneously (high throughput) but each one takes a long time (high latency)
+
+<Note>
+You can have a system with low latency but low throughput, or high throughput but high latency.
+</Note>
+
+## Design goals
+
+Generally, you should aim for **maximal throughput** with **acceptable latency**.
+
+The optimal balance depends on your use case:
+
+- **Latency-sensitive applications**: Real-time gaming, video conferencing, trading systems
+- **Throughput-sensitive applications**: Batch processing, data analytics, log aggregation
+
+## Trade-offs
+
+Improving one metric can sometimes come at the expense of the other:
+
+### Increasing throughput
+
+Strategies to increase throughput:
+- Batching operations
+- Parallel processing
+- Connection pooling
+- Asynchronous processing
+
+<Warning>
+Batching operations may increase throughput but can also increase latency for individual operations.
+</Warning>
+
+### Reducing latency
+
+Strategies to reduce latency:
+- Caching
+- Data locality optimization
+- Reducing network hops
+- Using faster storage (SSD vs HDD)
+- Geographic distribution (CDNs)
+
+<Info>
+Caching can improve both latency and throughput by reducing the need to fetch data from slower backend systems.
+</Info>
+
+## Additional resources
+
+- [Understanding latency vs throughput](https://community.cadence.com/cadence_blogs_8/b/fv/posts/understanding-latency-vs-throughput)

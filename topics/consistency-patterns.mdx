@@ -1,0 +1,155 @@
+---
+title: Consistency patterns
+description: Understanding weak, eventual, and strong consistency patterns in distributed systems
+---
+
+With multiple copies of the same data, we are faced with options on how to synchronize them so clients have a consistent view of the data. Recall the definition of consistency from the [CAP theorem](/topics/availability-vs-consistency#cap-theorem) - Every read receives the most recent write or an error.
+
+## Weak consistency
+
+After a write, reads may or may not see it. A best effort approach is taken.
+
+### How it works
+
+In weak consistency, there are no guarantees that a read will return the most recent write. The system makes a best effort to propagate updates, but doesn't guarantee it.
+
+### Use cases
+
+This approach is seen in systems such as memcached. Weak consistency works well in real time use cases such as:
+
+- VoIP (Voice over IP)
+- Video chat
+- Realtime multiplayer games
+- Live streaming
+
+<Note>
+For example, if you are on a phone call and lose reception for a few seconds, when you regain connection you do not hear what was spoken during connection loss.
+</Note>
+
+### Trade-offs
+
+**Advantages:**
+- Highest performance
+- Lowest latency
+- Maximum availability
+- Best for real-time applications where recent data is more important than all data
+
+**Disadvantages:**
+- No guarantee of consistency
+- Data may be lost
+- Difficult to reason about application state
+
+## Eventual consistency
+
+After a write, reads will eventually see it (typically within milliseconds). Data is replicated asynchronously.
+
+### How it works
+
+Eventual consistency guarantees that, given enough time and no new updates, all replicas will converge to the same value. Updates are propagated asynchronously in the background.
+
+### Use cases
+
+This approach is seen in systems such as:
+
+- DNS (Domain Name System)
+- Email systems
+- Amazon S3
+- Cassandra (default)
+- DynamoDB
+
+Eventual consistency works well in highly available systems.
+
+<Info>
+Eventual consistency is the most common consistency model in distributed systems because it provides a good balance between availability, performance, and consistency.
+</Info>
+
+### Trade-offs
+
+**Advantages:**
+- High availability
+- Good performance
+- Scales well
+- Tolerates network partitions
+- Works well for systems where updates are infrequent or conflicts are rare
+
+**Disadvantages:**
+- Temporary inconsistencies
+- Complex conflict resolution
+- Application must handle stale data
+- Debugging can be challenging
+
+### Conflict resolution
+
+When using eventual consistency, you need strategies to handle conflicts:
+
+- **Last write wins (LWW)**: Use timestamps to determine which write is most recent
+- **Vector clocks**: Track causality between updates
+- **CRDTs (Conflict-free Replicated Data Types)**: Data structures designed to merge conflicting updates automatically
+- **Application-level resolution**: Let the application or user resolve conflicts
+
+## Strong consistency
+
+After a write, reads will see it. Data is replicated synchronously.
+
+### How it works
+
+Strong consistency guarantees that a read will always return the most recent write. All replicas must acknowledge a write before it is considered successful.
+
+### Use cases
+
+This approach is seen in:
+
+- File systems
+- Relational databases (RDBMS)
+- Systems that need ACID transactions
+- Financial systems
+- Inventory management systems
+
+Strong consistency works well in systems that need transactions.
+
+<Warning>
+Strong consistency comes at the cost of availability and performance. During network partitions, the system may become unavailable.
+</Warning>
+
+### Trade-offs
+
+**Advantages:**
+- Simple to reason about
+- No stale data
+- ACID guarantees
+- Suitable for applications requiring correctness
+
+**Disadvantages:**
+- Lower availability during partitions
+- Higher latency (synchronous replication)
+- More difficult to scale
+- Performance bottlenecks
+
+## Choosing a consistency pattern
+
+Consider the following when choosing a consistency pattern:
+
+1. **Business requirements**: What are the consequences of inconsistent data?
+2. **User experience**: Can users tolerate seeing stale data?
+3. **Performance needs**: How much latency is acceptable?
+4. **Scale requirements**: How much will the system need to scale?
+5. **Availability requirements**: How important is it for the system to always be available?
+
+### Decision matrix
+
+| Requirement | Weak | Eventual | Strong |
+|-------------|------|----------|--------|
+| Consistency guarantees | None | Eventually | Immediate |
+| Availability | Highest | High | Lower |
+| Performance | Fastest | Fast | Slower |
+| Latency | Lowest | Low | Higher |
+| Scalability | Excellent | Excellent | Limited |
+| Use case | Real-time | High availability | Transactions |
+
+<Info>
+Many modern databases allow you to tune consistency levels on a per-operation basis, giving you flexibility to choose the right consistency level for each use case.
+</Info>
+
+## Additional resources
+
+- [Transactions across data centers](http://snarfed.org/transactions_across_datacenters_io.html)

@@ -1,0 +1,67 @@
+---
+title: Application Layer
+description: Understanding application layer architecture, microservices, and service discovery
+---
+
+Separating out the web layer from the application layer (also known as platform layer) allows you to scale and configure both layers independently. Adding a new API results in adding application servers without necessarily adding additional web servers. The **single responsibility principle** advocates for small and autonomous services that work together. Small teams with small services can plan more aggressively for rapid growth.
+
+<img src="https://camo.githubusercontent.com/feeb549c5b6e94c1c2838b6f0c04aa23bd3e46ab/687474703a2f2f692e696d6775722e636f6d2f79423553597766e2809c.6d2e706e67" alt="Application Layer" />
+
+Workers in the application layer also help enable [asynchronism](/components/asynchronism).
+
+## Microservices
+
+Related to this discussion are [microservices](https://en.wikipedia.org/wiki/Microservices), which can be described as a suite of independently deployable, small, modular services. Each service runs a unique process and communicates through a well-defined, lightweight mechanism to serve a business goal.
+
+### Example Architecture
+
+Pinterest, for example, could have the following microservices:
+- User profile
+- Follower
+- Feed
+- Search
+- Photo upload
+- Etc.
+
+### Microservices Benefits
+
+- **Independent deployment** - Each service can be deployed independently
+- **Independent scaling** - Scale individual services based on their specific needs
+- **Technology flexibility** - Different services can use different technologies
+- **Team autonomy** - Small teams can own and manage individual services
+- **Fault isolation** - Failure in one service doesn't bring down the entire system
+
+## Service Discovery
+
+Systems such as [Consul](https://www.consul.io/docs/index.html), [Etcd](https://coreos.com/etcd/docs/latest), and [Zookeeper](http://www.slideshare.net/sauravhaloi/introduction-to-apache-zookeeper) can help services find each other by keeping track of registered names, addresses, and ports.
+
+### How Service Discovery Works
+
+1. Services register themselves with the service discovery system
+2. Services query the discovery system to find other services
+3. Health checks verify service integrity
+4. Failed services are automatically removed from the registry
+
+### Health Checks
+
+[Health checks](https://www.consul.io/intro/getting-started/checks.html) help verify service integrity and are often done using an HTTP endpoint. Both Consul and Etcd have a built in [key-value store](/components/database#key-value-store) that can be useful for storing config values and other shared data.
+
+<Accordion title="Disadvantages of Application Layer">
+
+- Adding an application layer with loosely coupled services requires a different approach from an architectural, operations, and process viewpoint (vs a monolithic system).
+- Microservices can add complexity in terms of deployments and operations.
+
+</Accordion>
+
+<Note>
+**Microservices Trade-off:** While microservices provide flexibility and scalability, they introduce operational complexity. Consider starting with a monolith and evolving to microservices as needed.
+</Note>
+
+## Source(s) and Further Reading
+
+- [Intro to architecting systems for scale](http://lethain.com/introduction-to-architecting-systems-for-scale)
+- [Crack the system design interview](http://www.puncsky.com/blog/2016-02-13-crack-the-system-design-interview)
+- [Service oriented architecture](https://en.wikipedia.org/wiki/Service-oriented_architecture)
+- [Introduction to Zookeeper](http://www.slideshare.net/sauravhaloi/introduction-to-apache-zookeeper)
+- [Here's what you need to know about building microservices](https://cloudncode.wordpress.com/2016/07/22/msa-getting-started/)
+- [What are microservices?](https://smartbear.com/learn/api-design/what-are-microservices)

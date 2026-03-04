@@ -1,0 +1,411 @@
+---
+title: Design Data Structures for a Social Network
+description: Learn how to design the data structures and services to find the shortest path between users in a social network with millions of users
+---
+
+## Overview
+
+Design the data structures for a social network that enables users to search for connections and find the shortest path to another person. This problem explores graph algorithms (BFS), distributed systems, sharding strategies, and optimizing friend searches at massive scale.
+
+## Step 1: Use Cases and Constraints
+
+### Use Cases
+
+#### In Scope
+
+- **User** searches for someone and sees the shortest path to the searched person
+- **Service** has high availability
+
+### Constraints and Assumptions
+
+**Assumptions:**
+
+- Traffic is not evenly distributed
+  - Some searches are very popular, others executed once
+- Graph data won't fit on a single machine
+- Graph edges are unweighted
+- 100 million users
+- 50 friends per user average
+- 1 billion friend searches per month
+
+<Note>
+Exercise traditional systems - don't use graph-specific solutions like GraphQL or Neo4j for this exercise.
+</Note>
+
+### Usage Calculations
+
+<Accordion title="Back-of-the-envelope calculations">
+
+**Data:**
+- 5 billion friend relationships
+  - 100 million users × 50 friends per user average
+
+**Throughput:**
+- 400 search requests per second
+
+**Conversion guide:**
+- 2.5 million seconds per month
+- 1 request per second = 2.5 million requests per month
+- 40 requests per second = 100 million requests per month
+- 400 requests per second = 1 billion requests per month
+
+</Accordion>
+
+## Step 2: High Level Design
+
+![Social Network High Level Design](http://i.imgur.com/wxXyq2J.png)
+
+## Step 3: Core Components
+
+### Use Case: User Searches for Connection Path
+
+Without the constraint of millions of users, we could solve this unweighted shortest path problem with standard BFS:
+
+<Accordion title="Basic BFS implementation (single machine)">
+
+```python
+class Graph(Graph):
+
+    def shortest_path(self, source, dest):
+        if source is None or dest is None:
+            return None
+        if source is dest:
+            return [source.key]
+        prev_node_keys = self._shortest_path(source, dest)
+        if prev_node_keys is None:
+            return None
+        else:
+            path_ids = [dest.key]
+            prev_node_key = prev_node_keys[dest.key]
+            while prev_node_key is not None:
+                path_ids.append(prev_node_key)
+                prev_node_key = prev_node_keys[prev_node_key]
+            return path_ids[::-1]
+
+    def _shortest_path(self, source, dest):
+        queue = deque()
+        queue.append(source)
+        prev_node_keys = {source.key: None}
+        source.visit_state = State.visited
+        while queue:
+            node = queue.popleft()
+            if node is dest:
+                return prev_node_keys
+            prev_node = node
+            for adj_node in node.adj_nodes.values():
+                if adj_node.visit_state == State.unvisited:
+                    queue.append(adj_node)
+                    prev_node_keys[adj_node.key] = prev_node.key
+                    adj_node.visit_state = State.visited
+        return None
+```
+
+</Accordion>
+
+### Distributed Architecture
+
+Since users won't fit on one machine, we need to shard across **Person Servers** with a **Lookup Service**.
+
+<Steps>
+
+<Step title="Client sends request">
+  Client sends request to Web Server (reverse proxy)
+</Step>
+
+<Step title="Web Server routes to Search API">
+  Web Server forwards to Search API server
+</Step>
+
+<Step title="Search API uses User Graph Service">
+  User Graph Service:
+  - Uses Lookup Service to find Person Server with current user's info
+  - Retrieves user's `friend_ids` list
+  - Runs BFS using current user as source
+  - For each adjacent node, queries Lookup Service to find the Person Server
+</Step>
+
+</Steps>
+
+### Implementation Components
+
+<Accordion title="LookupService class">
+
+```python
+class LookupService(object):
+
+    def __init__(self):
+        self.lookup = self._init_lookup()  # key: person_id, value: person_server
+
+    def _init_lookup(self):
+        ...
+
+    def lookup_person_server(self, person_id):
+        return self.lookup[person_id]
+```
+
+</Accordion>
+
+<Accordion title="PersonServer class">
+
+```python
+class PersonServer(object):
+
+    def __init__(self):
+        self.people = {}  # key: person_id, value: person
+
+    def add_person(self, person):
+        ...
+
+    def people(self, ids):
+        results = []
+        for id in ids:
+            if id in self.people:
+                results.append(self.people[id])
+        return results
+```
+
+</Accordion>
+
+<Accordion title="Person class">
+
+```python
+class Person(object):
+
+    def __init__(self, id, name, friend_ids):
+        self.id = id
+        self.name = name
+        self.friend_ids = friend_ids
+```
+
+</Accordion>
+
+<Accordion title="UserGraphService class">
+
+```python
+class UserGraphService(object):
+
+    def __init__(self, lookup_service):
+        self.lookup_service = lookup_service
+
+    def person(self, person_id):
+        person_server = self.lookup_service.lookup_person_server(person_id)
+        return person_server.people([person_id])
+
+    def shortest_path(self, source_key, dest_key):
+        if source_key is None or dest_key is None:
+            return None
+        if source_key is dest_key:
+            return [source_key]
+        prev_node_keys = self._shortest_path(source_key, dest_key)
+        if prev_node_keys is None:
+            return None
+        else:
+            # Iterate backwards from dest_key
+            path_ids = [dest_key]
+            prev_node_key = prev_node_keys[dest_key]
+            while prev_node_key is not None:
+                path_ids.append(prev_node_key)
+                prev_node_key = prev_node_keys[prev_node_key]
+            return path_ids[::-1]
+
+    def _shortest_path(self, source_key, dest_key):
+        source = self.person(source_key)
+        queue = deque()
+        queue.append(source)
+        prev_node_keys = {source_key: None}
+        visited_ids = set()
+        visited_ids.add(source.id)
+        while queue:
+            node = queue.popleft()
+            if node.key is dest_key:
+                return prev_node_keys
+            prev_node = node
+            for friend_id in node.friend_ids:
+                if friend_id not in visited_ids:
+                    friend_node = self.person(friend_id)
+                    queue.append(friend_node)
+                    prev_node_keys[friend_id] = prev_node.key
+                    visited_ids.add(friend_id)
+        return None
+```
+
+</Accordion>
+
+### REST API
+
+```bash
+curl https://social.com/api/v1/friend_search?person_id=1234
+```
+
+**Response:**
+
+```json
+[
+  {
+    "person_id": "100",
+    "name": "foo",
+    "link": "https://social.com/foo"
+  },
+  {
+    "person_id": "53",
+    "name": "bar",
+    "link": "https://social.com/bar"
+  },
+  {
+    "person_id": "1234",
+    "name": "baz",
+    "link": "https://social.com/baz"
+  }
+]
+```
+
+## Step 4: Scale the Design
+
+![Social Network Scaled Design](http://i.imgur.com/cdCv5g7.png)
+
+<Warning>
+**Important:** Take an iterative approach:
+1. Benchmark/Load Test
+2. Profile for bottlenecks
+3. Address bottlenecks
+4. Repeat
+</Warning>
+
+### Scaling Components
+
+<CardGroup cols={2}>
+
+<Card title="DNS" icon="globe">
+Route users to nearest data center
+</Card>
+
+<Card title="Load Balancer" icon="scale-balanced">
+Distribute traffic across web servers
+</Card>
+
+<Card title="Web Servers" icon="window">
+Horizontal scaling as reverse proxies
+</Card>
+
+<Card title="API Servers" icon="code">
+Application layer for search logic
+</Card>
+
+<Card title="Memory Cache" icon="database">
+Cache person data (Redis/Memcached) for 400 average reads/second
+- Reduce response times
+- Reduce traffic to downstream services
+- Especially useful for:
+  - Users doing multiple searches
+  - Well-connected people
+</Card>
+
+</CardGroup>
+
+### BFS Optimizations
+
+<AccordionGroup>
+
+<Accordion title="Cache BFS Traversals">
+**Strategy:** Store complete or partial BFS traversals in Memory Cache.
+
+**Benefit:** Speed up subsequent lookups.
+</Accordion>
+
+<Accordion title="Batch Compute Offline">
+**Strategy:** Pre-compute BFS traversals offline using batch processing.
+
+**Storage:** Store in NoSQL Database for fast retrieval.
+</Accordion>
+
+<Accordion title="Batch Friend Lookups">
+**Strategy:** Reduce machine jumps by batching friend lookups on same Person Server.
+
+**Enhancement:** Shard Person Servers by location (friends often live closer).
+</Accordion>
+
+<Accordion title="Bidirectional BFS">
+**Strategy:** Run two BFS searches simultaneously:
+- One from source
+- One from destination
+- Merge paths when they meet
+
+**Benefit:** Potentially reduces search space.
+</Accordion>
+
+<Accordion title="Start from High-Degree Nodes">
+**Strategy:** Start BFS from people with large numbers of friends.
+
+**Benefit:** More likely to reduce degrees of separation.
+</Accordion>
+
+<Accordion title="Set Search Limits">
+**Strategy:** Limit based on time or number of hops.
+
+**Implementation:** Ask user if they want to continue searching after limit.
+
+**Reason:** Some searches could take considerable time.
+</Accordion>
+
+<Accordion title="Graph Database (if constraints allow)">
+**Options:**
+- Neo4j
+- GraphQL
+
+**Note:** Only if there were no constraint preventing graph databases.
+</Accordion>
+
+</AccordionGroup>
+
+## Implementation Reference
+
+<Card title="Python Implementation" icon="code" href="https://github.com/donnemartin/system-design-primer/tree/master/solutions/system_design/social_graph">
+  View the complete Python implementation including distributed BFS logic.
+</Card>
+
+## Related Topics
+
+<CardGroup cols={2}>
+
+<Card title="SQL Scaling Patterns" icon="database">
+- Read replicas
+- Federation
+- Sharding
+- Denormalization
+- SQL Tuning
+</Card>
+
+<Card title="NoSQL Options" icon="table">
+- Key-value store
+- Document store
+- Wide column store
+- Graph database
+</Card>
+
+<Card title="Caching Strategies" icon="bolt">
+- Cache-aside
+- Write-through
+- Write-behind
+- Refresh ahead
+</Card>
+
+<Card title="Asynchronous Processing" icon="gears">
+- Message queues
+- Task queues
+- Back pressure
+- Microservices
+</Card>
+
+</CardGroup>
+
+## Key Takeaways
+
+- **Sharding** Person Servers required for 100M users
+- **Lookup Service** maps person IDs to servers
+- **BFS algorithm** finds shortest path between users
+- **Memory Cache** stores person data for fast access
+- **Bidirectional BFS** can optimize search performance
+- **Batching** friend lookups reduces network hops
+- **Location-based sharding** leverages geographic proximity
+- **Pre-computed traversals** speed up common searches
+- Consider **Graph Database** for native graph operations

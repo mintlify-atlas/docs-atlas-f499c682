@@ -1,0 +1,110 @@
+---
+title: Introduction
+description: Learn how to design large-scale systems and prep for the system design interview
+---
+
+## Motivation
+
+<Note>
+**Learn how to design large-scale systems and prep for the system design interview.**
+</Note>
+
+### Learn how to design large-scale systems
+
+Learning how to design scalable systems will help you become a better engineer.
+
+System design is a broad topic. There is a **vast amount of resources scattered throughout the web** on system design principles.
+
+This repo is an **organized collection** of resources to help you learn how to build systems at scale.
+
+### Learn from the open source community
+
+This is a continually updated, open source project.
+
+Contributions are welcome!
+
+### Prep for the system design interview
+
+In addition to coding interviews, system design is a **required component** of the **technical interview process** at many tech companies.
+
+**Practice common system design interview questions** and **compare** your results with **sample solutions**: discussions, code, and diagrams.
+
+<CardGroup cols={2}>
+  <Card title="Study guide" icon="book" href="/study-guide">
+    Suggested topics to review based on your interview timeline
+  </Card>
+  <Card title="Anki flashcards" icon="brain" href="/anki-flashcards">
+    Spaced repetition flashcard decks for key concepts
+  </Card>
+</CardGroup>
+
+## How to approach a system design interview question
+
+<Tip>
+The system design interview is an **open-ended conversation**. You are expected to lead it.
+</Tip>
+
+You can use the following steps to guide the discussion. To help solidify this process, work through the system design interview questions using the following steps.
+
+### Step 1: Outline use cases, constraints, and assumptions
+
+Gather requirements and scope the problem. Ask questions to clarify use cases and constraints. Discuss assumptions.
+
+- Who is going to use it?
+- How are they going to use it?
+- How many users are there?
+- What does the system do?
+- What are the inputs and outputs of the system?
+- How much data do we expect to handle?
+- How many requests per second do we expect?
+- What is the expected read to write ratio?
+
+### Step 2: Create a high level design
+
+Outline a high level design with all important components.
+
+- Sketch the main components and connections
+- Justify your ideas
+
+### Step 3: Design core components
+
+Dive into details for each core component. For example, if you were asked to design a url shortening service, discuss:
+
+- Generating and storing a hash of the full url
+  - MD5 and Base62
+  - Hash collisions
+  - SQL or NoSQL
+  - Database schema
+- Translating a hashed url to the full url
+  - Database lookup
+- API and object-oriented design
+
+### Step 4: Scale the design
+
+Identify and address bottlenecks, given the constraints. For example, do you need the following to address scalability issues?
+
+- Load balancer
+- Horizontal scaling
+- Caching
+- Database sharding
+
+<Warning>
+Discuss potential solutions and trade-offs. **Everything is a trade-off.** Address bottlenecks using principles of scalable system design.
+</Warning>
+
+### Back-of-the-envelope calculations
+
+You might be asked to do some estimates by hand. Refer to the Appendix for the following resources:
+
+- Use back of the envelope calculations
+- Powers of two table
+- Latency numbers every programmer should know
+
+## Additional resources
+
+Check out the following links to get a better idea of what to expect:
+
+- [How to ace a systems design interview](https://web.archive.org/web/20210505130322/https://www.palantir.com/2011/10/how-to-rock-a-systems-design-interview/)
+- [The system design interview](http://www.hiredintech.com/system-design)
+- [Intro to Architecture and Systems Design Interviews](https://www.youtube.com/watch?v=ZgdS0EUmn70)
+- [System design template](https://leetcode.com/discuss/career/229177/My-System-Design-Template)

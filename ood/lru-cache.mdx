@@ -1,0 +1,184 @@
+---
+title: Design a Least Recently Used Cache
+description: Implement an LRU cache for caching web query results with O(1) operations
+---
+
+## Problem Statement
+
+Design and implement a Least Recently Used (LRU) cache that efficiently stores and retrieves cached data, automatically evicting the least recently used items when capacity is reached.
+
+## Constraints and Assumptions
+
+- Caching results of web queries
+- Inputs are valid (no validation needed)
+- The cache fits in memory
+- Need efficient O(1) access and update operations
+
+## Design Overview
+
+The LRU cache implementation uses three classes:
+
+1. **Node**: Represents a cached item in a doubly-linked list
+2. **LinkedList**: Maintains items in order of recency
+3. **Cache**: The main LRU cache with hash map for O(1) lookups
+
+<Note>
+  The LRU cache combines a hash map and a doubly-linked list to achieve O(1) time complexity for both get and set operations. The hash map provides fast lookups, while the linked list maintains the order of access.
+</Note>
+
+## Implementation
+
+### Node Class
+
+Represents a node in the doubly-linked list:
+
+```python
+class Node(object):
+
+    def __init__(self, results):
+        self.results = results
+        self.prev = None
+        self.next = None
+```
+
+### LinkedList Class
+
+Manages the order of cached items by recency:
+
+```python
+class LinkedList(object):
+
+    def __init__(self):
+        self.head = None
+        self.tail = None
+
+    def move_to_front(self, node):  # ...
+    def append_to_front(self, node):  # ...
+    def remove_from_tail(self):  # ...
+```
+
+**Key operations:**
+
+- `move_to_front()`: Move an accessed node to the front (most recently used)
+- `append_to_front()`: Add a new node at the front
+- `remove_from_tail()`: Remove the least recently used node
+
+### Cache Class
+
+The main LRU cache implementation:
+
+```python
+class Cache(object):
+
+    def __init__(self, MAX_SIZE):
+        self.MAX_SIZE = MAX_SIZE
+        self.size = 0
+        self.lookup = {}  # key: query, value: node
+        self.linked_list = LinkedList()
+
+    def get(self, query):
+        """Get the stored query result from the cache.
+        
+        Accessing a node updates its position to the front of the LRU list.
+        """
+        node = self.lookup.get(query)
+        if node is None:
+            return None
+        self.linked_list.move_to_front(node)
+        return node.results
+
+    def set(self, results, query):
+        """Set the result for the given query key in the cache.
+        
+        When updating an entry, updates its position to the front of the LRU list.
+        If the entry is new and the cache is at capacity, removes the oldest entry
+        before the new entry is added.
+        """
+        node = self.lookup.get(query)
+        if node is not None:
+            # Key exists in cache, update the value
+            node.results = results
+            self.linked_list.move_to_front(node)
+        else:
+            # Key does not exist in cache
+            if self.size == self.MAX_SIZE:
+                # Remove the oldest entry from the linked list and lookup
+                self.lookup.pop(self.linked_list.tail.query, None)
+                self.linked_list.remove_from_tail()
+            else:
+                self.size += 1
+            # Add the new key and value
+            new_node = Node(results)
+            self.linked_list.append_to_front(new_node)
+            self.lookup[query] = new_node
+```
+
+## Key Design Patterns
+
+### Hybrid Data Structure
+
+The LRU cache combines two data structures for optimal performance:
+
+1. **Hash Map (`lookup`)**: Provides O(1) access to nodes by query key
+2. **Doubly-Linked List**: Maintains items in order of recency with O(1) insertion/deletion
+
+```
+┌─────────────┐
+│   lookup    │  Hash Map: query -> node
+├─────────────┤
+│ query1: n1  │
+│ query2: n2  │
+│ query3: n3  │
+└─────────────┘
+       ↓
+┌──────────────────────────────┐
+│  Doubly-Linked List (LRU)    │
+├──────────────────────────────┤
+│ head → [n3] ↔ [n1] ↔ [n2] ← tail
+│        MRU              LRU
+└──────────────────────────────┘
+```
+
+### Access Pattern Updates
+
+Every time an item is accessed (via `get()` or `set()`), it moves to the front of the list:
+
+- **Get operation**: Retrieve value and move to front
+- **Set operation**: Insert at front or update and move to front
+- **Eviction**: Remove from tail when at capacity
+
+## Complexity Analysis
+
+| Operation | Time Complexity | Space Complexity |
+|-----------|-----------------|------------------|
+| get()     | O(1)            | O(1)             |
+| set()     | O(1)            | O(1)             |
+| Space     | -               | O(n)             |
+
+<Note>
+  Both get and set operations achieve O(1) time complexity because the hash map provides constant-time lookups, and the doubly-linked list allows constant-time insertion, deletion, and reordering of nodes.
+</Note>
+
+## Design Considerations
+
+### Advantages
+
+- **Fast access**: O(1) lookup and update operations
+- **Automatic eviction**: Removes least recently used items when at capacity
+- **Efficient memory usage**: Only stores items up to MAX_SIZE
+- **Recency tracking**: Always knows which items are most/least recently used
+
+### Use Cases
+
+1. **Web caching**: Cache results of expensive database queries or API calls
+2. **Browser cache**: Store recently accessed web pages
+3. **CDN**: Cache frequently accessed content
+4. **CPU cache**: Hardware-level caching strategies
+
+### Potential Improvements
+
+1. **TTL (Time To Live)**: Add expiration times for cached items
+2. **Cache statistics**: Track hit/miss rates and performance metrics
+3. **Weighted LRU**: Give different priorities to different types of queries
+4. **Thread safety**: Add locks for concurrent access
+5. **Persistence**: Save cache to disk for recovery after restart
