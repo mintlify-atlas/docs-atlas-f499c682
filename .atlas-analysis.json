@@ -1,0 +1,127 @@
+{
+  "projectType": "general",
+  "projectName": "System Design Primer",
+  "projectDescription": "A comprehensive learning resource for designing large-scale systems and preparing for system design interviews.",
+  "theme": "maple",
+  "primaryColor": "#7cbce4",
+  "lightColor": "#b2d6ef",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Learn",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "study-guide",
+              "anki-flashcards"
+            ]
+          },
+          {
+            "group": "System Design Topics",
+            "pages": [
+              "topics/getting-started",
+              "topics/performance-vs-scalability",
+              "topics/latency-vs-throughput",
+              "topics/availability-vs-consistency",
+              "topics/consistency-patterns",
+              "topics/availability-patterns"
+            ]
+          },
+          {
+            "group": "Core Components",
+            "pages": [
+              "components/dns",
+              "components/cdn",
+              "components/load-balancer",
+              "components/reverse-proxy",
+              "components/application-layer",
+              "components/database",
+              "components/cache",
+              "components/asynchronism",
+              "components/communication",
+              "components/security"
+            ]
+          },
+          {
+            "group": "Database",
+            "pages": [
+              "database/rdbms",
+              "database/nosql",
+              "database/sql-vs-nosql"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Interview Prep",
+        "groups": [
+          {
+            "group": "Interview Guide",
+            "pages": [
+              "interview/approach",
+              "interview/calculations"
+            ]
+          },
+          {
+            "group": "System Design Problems",
+            "pages": [
+              "solutions/pastebin",
+              "solutions/twitter",
+              "solutions/web-crawler",
+              "solutions/mint",
+              "solutions/social-network",
+              "solutions/key-value-store",
+              "solutions/sales-rank",
+              "solutions/scaling-aws"
+            ]
+          },
+          {
+            "group": "Object-Oriented Design",
+            "pages": [
+              "ood/hash-map",
+              "ood/lru-cache",
+              "ood/call-center",
+              "ood/deck-of-cards",
+              "ood/parking-lot",
+              "ood/chat-server"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Resources",
+            "pages": [
+              "reference/powers-of-two",
+              "reference/latency-numbers",
+              "reference/real-world-architectures",
+              "reference/company-blogs"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Comprehensive system design learning guide",
+    "8 complete system design interview solutions with code",
+    "6 object-oriented design problems with Python implementations",
+    "Anki flashcard decks for spaced repetition learning",
+    "Deep dives into core distributed system components",
+    "Real-world architecture examples and company engineering blogs",
+    "Step-by-step approach to system design interviews"
+  ],
+  "publicApiSurface": [
+    "System Design Topics: DNS, CDN, Load Balancers, Reverse Proxy, Application Layer, Database, Cache, Asynchronism, Communication",
+    "Database Patterns: Master-Slave Replication, Master-Master Replication, Federation, Sharding, Denormalization, SQL Tuning",
+    "NoSQL Types: Key-Value Store, Document Store, Wide Column Store, Graph Database",
+    "Caching Strategies: Cache-Aside, Write-Through, Write-Behind, Refresh-Ahead",
+    "Interview Solutions: Pastebin/Bit.ly, Twitter Timeline, Web Crawler, Mint.com, Social Network, Key-Value Store, Sales Ranking, AWS Scaling",
+    "OOD Solutions: Hash Map, LRU Cache, Call Center, Deck of Cards, Parking Lot, Chat Server"
+  ]
+}
